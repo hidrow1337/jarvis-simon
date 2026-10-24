@@ -57,7 +57,7 @@ def persona():
     return "\n\n".join(x for x in (base, extra) if x)
 
 
-def voice_status():
+def voice_service_status():
     """Whether the voice-service answers ready, plus its health details."""
     h = voice.health()
     if h is None:
@@ -129,14 +129,14 @@ class Handler(BaseHTTPRequestHandler):
                 workdir=runtime.WORKDIR,
                 model=runtime.MODEL or "Hermes default",
                 tools=runtime.hermes_tools_snapshot(),
-                voice=voice_status(),
+                voice_service=voice_service_status(),
                 browser_tts=True,
                 voice_id=voice.voice_id() if voice.available() else "browser",
                 tts="elevenlabs" if voice.available() else "browser",
                 session=SESSION["id"]))
-        if p == "/api/voice":
+        if p == "/api/voice-service":
             # cheap re-check for the HUD's poll; /api/status also asks Hermes
-            return self._json(voice_status())
+            return self._json(voice_service_status())
         if p == "/api/jobs":
             if not self._token_ok():
                 return self._json({"error": "unauthorized"}, 401)

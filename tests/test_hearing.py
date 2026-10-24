@@ -27,10 +27,10 @@ class HearingTest(VoiceTestCase):
         self.assertEqual(res.status, 503)
         self.assertIn("could not decode", res.json()["error"])
 
-    def test_status_reports_voice_online_with_health_details(self):
-        voice = self.dashboard.get("/api/status").json()["voice"]
+    def test_status_reports_voice_service_online_with_health_details(self):
+        service = self.dashboard.get("/api/status").json()["voice_service"]
 
-        self.assertEqual(voice, {
+        self.assertEqual(service, {
             "online": True,
             "hearing_model": "fake",
             "speaking_model": "fake",
@@ -38,11 +38,11 @@ class HearingTest(VoiceTestCase):
             "device": "cpu",
         })
 
-    def test_voice_poll_reports_the_same_as_status(self):
-        res = self.dashboard.get("/api/voice")
+    def test_voice_service_poll_reports_the_same_as_status(self):
+        res = self.dashboard.get("/api/voice-service")
 
         self.assertEqual(res.status, 200)
-        self.assertEqual(res.json(), self.dashboard.get("/api/status").json()["voice"])
+        self.assertEqual(res.json(), self.dashboard.get("/api/status").json()["voice_service"])
         self.assertTrue(res.json()["online"])
 
     def test_listen_keeps_its_request_checks(self):
@@ -67,13 +67,13 @@ class HearingWithServiceStoppedTest(VoiceTestCase):
         super().setUpClass()
         cls.voice.stop()
 
-    def test_status_reports_voice_offline(self):
-        voice = self.dashboard.get("/api/status").json()["voice"]
+    def test_status_reports_voice_service_offline(self):
+        service = self.dashboard.get("/api/status").json()["voice_service"]
 
-        self.assertEqual(voice, {"online": False})
+        self.assertEqual(service, {"online": False})
 
-    def test_voice_poll_reports_offline(self):
-        self.assertEqual(self.dashboard.get("/api/voice").json(), {"online": False})
+    def test_voice_service_poll_reports_offline(self):
+        self.assertEqual(self.dashboard.get("/api/voice-service").json(), {"online": False})
 
     def test_listen_fails_with_503_and_says_the_service_is_offline(self):
         res = self.dashboard.post("/api/listen", audio_clip("webm"),

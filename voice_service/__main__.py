@@ -17,10 +17,14 @@ def main(argv=None):
                    help="what the fake Hearing model hears")
     args = p.parse_args(argv)
 
-    print(f"  voice-service · loading Hearing model {args.hearing}", flush=True)
-    hearing = models.HEARING[args.hearing](args)
-    print(f"  voice-service · loading Speaking model {args.speaking} ({args.voice})", flush=True)
-    speaking = models.SPEAKING[args.speaking](args)
+    try:
+        print(f"  voice-service · loading Hearing model {args.hearing}", flush=True)
+        hearing = models.HEARING[args.hearing](args)
+        print(f"  voice-service · loading Speaking model {args.speaking} ({args.voice})", flush=True)
+        speaking = models.SPEAKING[args.speaking](args)
+    except Exception as e:                                # noqa: BLE001
+        print(f"  voice-service · cannot start: {e}", file=sys.stderr, flush=True)
+        return 1
     srv = server.make_server(args.port, hearing, speaking, args.voice)
     print(f"  voice-service · ready on http://{server.HOST}:{args.port} "
           f"· device {hearing.device}", flush=True)

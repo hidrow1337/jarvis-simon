@@ -20,6 +20,10 @@ class AudioError(ValueError):
     """The audio itself is unusable (empty, or ffmpeg can't decode it)."""
 
 
+class ConversionError(RuntimeError):
+    """The service can't convert audio at all (ffmpeg missing or hung)."""
+
+
 def to_wav16k(audio, mime):
     """Any browser recording -> 16 kHz mono 16-bit WAV bytes, via ffmpeg.
 
@@ -38,7 +42,9 @@ def to_wav16k(audio, mime):
                  "-i", src, "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le", dst],
                 capture_output=True, timeout=FFMPEG_TIMEOUT)
         except FileNotFoundError:
-            raise RuntimeError("ffmpeg not found on PATH") from None
+            raise ConversionError("ffmpeg not found on PATH") from None
+        except subprocess.TimeoutExpired:
+            raise ConversionError(f"ffmpeg took over {FFMPEG_TIMEOUT}s") from None
         if proc.returncode != 0:
             msg = proc.stderr.decode(errors="replace").strip().splitlines()
             raise AudioError("ffmpeg could not decode the audio: "
@@ -103,8 +109,10 @@ def make_server(port, hearing, speaking, voice):
                     text = hearing.hear(wav)
             except AudioError as e:
                 return self._json({"error": str(e)[:300]}, 400)
+            except ConversionError as e:
+                return self._json({"error": str(e)[:300]}, 500)
             except Exception as e:                        # noqa: BLE001
-                return self._json({"error": f"Hearing failed: {e}"[:300]}, 500)
+                return self._json({"error": f"Hearing model failed: {e}"[:300]}, 500)
             return self._json({"text": (text or "").strip()})
 
     return ThreadingHTTPServer((HOST, port), Handler)

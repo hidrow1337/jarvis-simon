@@ -9,10 +9,10 @@ way, with fake Hearing/Speaking models injected.
 Stdlib only. The dashboard runs with the mock runtime, a Hermes command that
 doesn't exist, its browser auto-open off and its state file in a temp dir, so
 tests never launch Hermes or write the repo's state.json. Unless a test points
-JARVIS_VOICE_URL at a running voice-service, it points at a closed port, so voice
-is offline. Inherited JARVIS_*, VOICE_*,
-HERMES_* and ELEVENLABS_* variables are dropped; note that server.py still
-reads the repo's .env for any key the harness doesn't set.
+JARVIS_VOICE_URL at a running voice-service, it points at a closed port, so the
+voice-service is offline. Inherited JARVIS_*, HERMES_* and ELEVENLABS_*
+variables are dropped; note that server.py still reads the repo's .env for any
+key the harness doesn't set.
 """
 import http.client
 import json
@@ -28,7 +28,7 @@ import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 _TOKEN_META = re.compile(rb'<meta name="jarvis-token" content="([^"]+)">')
-_OWN_ENV = ("JARVIS_", "HERMES_", "ELEVENLABS_", "VOICE_")
+_OWN_ENV = ("JARVIS_", "HERMES_", "ELEVENLABS_")
 
 
 def free_port():
@@ -178,6 +178,9 @@ class Dashboard(_ServerProcess):
                             headers=self._api_headers({"Content-Type": content_type, **(headers or {})}))
 
 
+FAKE_HEARD = "the fake hearing model heard you"
+
+
 class VoiceService(_ServerProcess):
     """The real voice-service, with fake Hearing and Speaking models injected.
     The fake Hearing model answers FAKE_HEARD for any 16 kHz mono WAV."""
@@ -194,8 +197,6 @@ class VoiceService(_ServerProcess):
                 "--port", str(self.port), "--hearing", "fake", "--speaking", "fake",
                 "--fake-heard", FAKE_HEARD]
 
-
-FAKE_HEARD = "the fake hearing model heard you"
 
 
 def audio_clip(fmt, seconds=1.0):

@@ -3,7 +3,7 @@
    The brain is your own `hermes` CLI/profile, so configured Hermes tools,
    browser automation, skills, memory, MCP servers and third-party connectors are live. */
 const $ = s => document.querySelector(s);
-const RT = {tts:false, browserTts:false, voice:{online:false}};
+const RT = {tts:false, browserTts:false, service:{online:false}};
 const speechSynth = window.speechSynthesis;
 const API_TOKEN = document.querySelector('meta[name="jarvis-token"]')?.content || '';
 const apiHeaders = extra => ({'x-jarvis-token': API_TOKEN, ...(extra || {})});
@@ -191,8 +191,7 @@ function cleanForSpeech(text){
 
 /* ══════════ continuous voice conversation ══════════
    Click VOICE once. From then on: listen → you stop → the voice-service hears
-   it → Jarvis
-   answers and speaks → it listens again, automatically. No re-clicking between
+   it → Jarvis answers and speaks → it listens again, automatically. No re-clicking between
    turns. Click VOICE again (or press Esc) to end the conversation.
 
    The mic is deliberately DEAF while Jarvis is thinking or speaking (`suppress`)
@@ -244,35 +243,35 @@ function speak(text){
 // ── voice-service state ──
 // Hearing lives in the local voice-service. While it is offline the VOICE
 // button is disabled; it is re-checked on press and on the periodic poll.
-function voiceLabel(v){
-  const out = RT.tts ? 'ElevenLabs TTS' : 'browser TTS';
-  return v.online ? `${v.hearing_model} hearing (${v.device}) / ${out}` : 'VOICE OFFLINE';
+function serviceLabel(v){
+  const speaking = RT.tts ? 'ElevenLabs speaking' : 'browser speaking';
+  return v.online ? `${v.hearing_model} hearing (${v.device}) / ${speaking}` : 'VOICE OFFLINE';
 }
-function applyVoice(v){
-  const was = RT.voice.online;
-  RT.voice = v && typeof v === 'object' ? v : {online:false};
-  const on = RT.voice.online;
-  sys('voice', voiceLabel(RT.voice), on ? 'ok' : 'warn');
-  $('#top-voice').textContent = 'Voice: ' + voiceLabel(RT.voice);
+function applyVoiceService(v){
+  const was = RT.service.online;
+  RT.service = v && typeof v === 'object' ? v : {online:false};
+  const on = RT.service.online;
+  sys('voice', serviceLabel(RT.service), on ? 'ok' : 'warn');
+  $('#top-voice').textContent = 'Voice: ' + serviceLabel(RT.service);
   $('#top-voice').parentElement.classList.toggle('warn', !on);
   const mic = $('#mic');
   mic.disabled = !on;
   mic.title = on ? 'Talk to Jarvis' : 'Voice-service offline — start it, typed chat still works';
   if (!convo) mic.textContent = on ? '◉ VOICE' : 'VOICE OFFLINE';
   if (on !== was) log(on ? 'voice' : 'error', 'VOICE',
-    on ? `voice-service online · ${voiceLabel(RT.voice)}` : 'VOICE OFFLINE — voice-service unreachable; typed chat still works');
+    on ? `voice-service online · ${serviceLabel(RT.service)}` : 'VOICE OFFLINE — voice-service unreachable; typed chat still works');
   if (!on && convo) stopConvo();
 }
-async function checkVoice(){
-  try { applyVoice(await fetch('/api/voice').then(r => r.json())); }
-  catch(_){ applyVoice({online:false}); }
-  return RT.voice.online;
+async function checkVoiceService(){
+  try { applyVoiceService(await fetch('/api/voice-service').then(r => r.json())); }
+  catch(_){ applyVoiceService({online:false}); }
+  return RT.service.online;
 }
 
 // ── start / stop the whole conversation ──
 async function micToggle(){
   if (convo){ stopConvo(); return; }
-  if (!await checkVoice()) return;
+  if (!await checkVoiceService()) return;
   try {
     micStream = await navigator.mediaDevices.getUserMedia(
       {audio:{echoCancellation:true, noiseSuppression:true, autoGainControl:true}});
@@ -298,7 +297,7 @@ function stopConvo(){
   if (actx){ actx.close().catch(()=>{}); actx=null; analyser=null; }
   document.body.classList.remove('speaking');
   $('#mic').classList.remove('on');
-  applyVoice(RT.voice);                         // button text + enabled state
+  applyVoiceService(RT.service);                // button text + enabled state
   log('voice','VOICE','conversation closed');
   setState('', 'STANDBY', 'awaiting uplink');
 }
@@ -402,7 +401,7 @@ async function ship(){
   } catch(e){
     log('error','VOICE',`Hearing failed: ${String(e?.message || e).slice(0,200)}`);
     suppress = false;
-    await checkVoice();                         // closes the conversation if it went offline
+    await checkVoiceService();                  // closes the conversation if it went offline
     if (convo) beginTurn(); else setState('error','FAULT','Hearing failed');
   }
 }
@@ -502,7 +501,7 @@ setInterval(async () => {
       if (!running) speak(`Mission complete. ${(d.result||'').slice(0,300)}`);
     }
   } catch(_){}
-  checkVoice();
+  checkVoiceService();
 }, 4000);
 
 // ══════════ boot ══════════
@@ -525,8 +524,8 @@ setInterval(async () => {
 
     log('status', 'BOOT',
         `gateway online · ${s.runtime} core · profile=${s.profile || 'default'} · permission=${s.permission}`);
-    RT.voice = {online:null};                   // so the first applyVoice always logs
-    applyVoice(s.voice);
+    RT.service = {online:null};                 // so the first applyVoiceService always logs
+    applyVoiceService(s.voice_service);
     setState('', 'STANDBY', 'awaiting uplink');
   } catch(e){
     sys('gw','offline','warn');
