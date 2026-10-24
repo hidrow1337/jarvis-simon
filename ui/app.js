@@ -3,8 +3,7 @@
    The brain is your own `hermes` CLI/profile, so configured Hermes tools,
    browser automation, skills, memory, MCP servers and third-party connectors are live. */
 const $ = s => document.querySelector(s);
-const RT = {tts:false, browserTts:false, service:{online:false}};
-const speechSynth = window.speechSynthesis;
+const RT = {service:{online:false}};
 const API_TOKEN = document.querySelector('meta[name="jarvis-token"]')?.content || '';
 const apiHeaders = extra => ({'x-jarvis-token': API_TOKEN, ...(extra || {})});
 
@@ -204,28 +203,23 @@ let floorSum=0, floorN=0, threshold=0.02, peak=0, calibrating=true;
 const SILENCE=900, MIN_TURN_MS=350, MAX_TURN_MS=18000, NO_SPEECH_MS=10000;
 
 // ── voice out ──
+// Speaking lives in the voice-service too: the answer goes to /api/speak and
+// comes back as WAV. While the service is offline, voice is off and Jarvis
+// stays silent — typed chat still shows the answer.
 let muted = false, player = null;
 function speak(text){
   return new Promise(resolve => {
     text = cleanForSpeech(text);
-    if (muted || !text) return resolve();
+    if (muted || !text || !RT.service.online) return resolve();
     suppress = true;
     const spoken = text.length > 700 ? text.slice(0, 680).replace(/\s+\S*$/,'') + '…' : text;
-    if (!RT.tts && RT.browserTts && speechSynth){
-      try{
-        speechSynth.cancel();
-        const u = new SpeechSynthesisUtterance(spoken);
-        u.rate = 0.95; u.pitch = 0.82; u.volume = 1;
-        document.body.classList.add('speaking');
-        u.onend = u.onerror = () => { document.body.classList.remove('speaking'); resolve(); };
-        speechSynth.speak(u);
-        return;
-      }catch(_){ return resolve(); }
-    }
-    if (!RT.tts) return resolve();
     fetch('/api/speak', {method:'POST', headers:apiHeaders({'content-type':'application/json'}),
                          body: JSON.stringify({text:spoken})})
-      .then(r => r.ok ? r.blob() : Promise.reject())
+      .then(async r => {
+        if (r.ok) return r.blob();
+        const err = await r.json().catch(() => ({}));
+        throw new Error(err.error || `HTTP ${r.status}`);
+      })
       .then(blob => {
         const url = URL.createObjectURL(blob);
         if (player) player.pause();
@@ -236,23 +230,28 @@ function speak(text){
         player.onended = done; player.onerror = done;
         return player.play();
       })
-      .catch(() => resolve());
+      .catch(e => {
+        log('error','VOICE',`Speaking failed: ${String(e?.message || e).slice(0,200)}`);
+        checkVoiceService();
+        resolve();
+      });
   });
 }
 
 // ── voice-service state ──
-// Hearing lives in the local voice-service. While it is offline the VOICE
-// button is disabled; it is re-checked on press and on the periodic poll.
-function serviceLabel(v){
-  const speaking = RT.tts ? 'ElevenLabs speaking' : 'browser speaking';
-  return v.online ? `${v.hearing_model} hearing (${v.device}) / ${speaking}` : 'VOICE OFFLINE';
+// Hearing and Speaking live in the local voice-service. While it is offline the
+// VOICE button is disabled; it is re-checked on press and on the periodic poll.
+const cap = s => String(s ?? '?').replace(/^./, c => c.toUpperCase());
+function serviceLabel(v){        // e.g. "Parakeet / Kokoro · bm_george"
+  return v.online ? `${cap(v.hearing_model)} / ${cap(v.speaking_model)} · ${v.voice}` : 'VOICE OFFLINE';
 }
 function applyVoiceService(v){
   const was = RT.service.online;
   RT.service = v && typeof v === 'object' ? v : {online:false};
   const on = RT.service.online;
-  sys('voice', serviceLabel(RT.service), on ? 'ok' : 'warn');
-  $('#top-voice').textContent = 'Voice: ' + serviceLabel(RT.service);
+  sys('voice', on ? `local · ${serviceLabel(RT.service)} (${RT.service.device})` : serviceLabel(RT.service),
+      on ? 'ok' : 'warn');
+  $('#top-voice').textContent = (on ? 'Local voice: ' : 'Voice: ') + serviceLabel(RT.service);
   $('#top-voice').parentElement.classList.toggle('warn', !on);
   const mic = $('#mic');
   mic.disabled = !on;
@@ -509,8 +508,6 @@ setInterval(async () => {
   defaultTip = $('#tip').textContent;
   try {
     const s = await fetch('/api/status').then(r=>r.json());
-    RT.tts = s.tts==='elevenlabs'; RT.browserTts = !!speechSynth;
-
     const port = location.port || '8730';
     sys('gw', `online · :${port}`, 'ok');
     sys('brain', s.runtime === 'hermes' ? 'Hermes Agent' : 'Hermes offline', s.runtime === 'hermes' ? 'ok' : 'warn');

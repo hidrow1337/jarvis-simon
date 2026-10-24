@@ -10,8 +10,8 @@ Stdlib only. The dashboard runs with the mock runtime, a Hermes command that
 doesn't exist, its browser auto-open off and its state file in a temp dir, so
 tests never launch Hermes or write the repo's state.json. Unless a test points
 JARVIS_VOICE_URL at a running voice-service, it points at a closed port, so the
-voice-service is offline. Inherited JARVIS_*, HERMES_* and ELEVENLABS_*
-variables are dropped; note that server.py still reads the repo's .env for any
+voice-service is offline. Inherited JARVIS_* and HERMES_* variables are
+dropped; note that server.py still reads the repo's .env for any
 key the harness doesn't set.
 """
 import http.client
@@ -28,7 +28,7 @@ import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 _TOKEN_META = re.compile(rb'<meta name="jarvis-token" content="([^"]+)">')
-_OWN_ENV = ("JARVIS_", "HERMES_", "ELEVENLABS_")
+_OWN_ENV = ("JARVIS_", "HERMES_")
 
 
 def free_port():

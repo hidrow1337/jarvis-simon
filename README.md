@@ -9,8 +9,7 @@ A local, voice-enabled JARVIS dashboard for [Hermes Agent](https://github.com/No
 - Futuristic browser-based mission-control HUD
 - Natural conversational replies with a concise JARVIS voice persona
 - Continuous voice conversation: listen → transcribe → answer → speak → listen
-- Optional ElevenLabs speech-to-text and text-to-speech
-- Browser speech fallback when ElevenLabs is not configured
+- Local Hearing and Speaking through a voice-service on your own machine (see ADR 0001)
 - Working command matrix and slash commands
 - Hermes session continuity across voice turns
 - Access to the active Hermes profile's tools, skills, browser, memory, and MCP integrations
@@ -40,7 +39,7 @@ The installer creates a private `.env` file, starts the dashboard, and opens:
 
 <http://127.0.0.1:8730>
 
-No API keys are required for the basic dashboard. Browser speech APIs are used as a fallback.
+No API keys are required. Voice needs the local voice-service; without it, typed chat still works.
 
 ## One-prompt installation with Hermes
 
@@ -52,15 +51,7 @@ Hermes can perform the clone, setup, launch, and health check with its terminal 
 
 ## Voice setup
 
-Voice works without configuration when the browser provides SpeechRecognition and speechSynthesis. For more reliable speech, add an ElevenLabs key to the private `.env` file:
-
-```bash
-ELEVENLABS_API_KEY=your_private_key
-ELEVENLABS_VOICE_ID=JBFqnCBsd6RMkjVDRZzb
-ELEVENLABS_MODEL=eleven_turbo_v2_5
-```
-
-Restart the dashboard after editing `.env`. The key stays server-side and is never sent to frontend JavaScript.
+Hearing and Speaking run in the local voice-service (`python3 -m voice_service`, see `voice_service/`). The dashboard finds it at `JARVIS_VOICE_URL` in `.env` (default `http://127.0.0.1:8731`). While it is offline the HUD shows VOICE OFFLINE and typed chat still works.
 
 ## Hermes profile and tools
 
@@ -112,10 +103,10 @@ Normal text and voice requests go directly to Hermes Agent.
 
 ```text
 Browser HUD
-  ├─ microphone → browser MediaRecorder → ElevenLabs STT (optional)
+  ├─ microphone → browser MediaRecorder → /api/listen → voice-service Hearing
   ├─ POST /api/run → Python NDJSON server
   ├─ Hermes CLI quiet mode → active Hermes profile and tools
-  └─ response → ElevenLabs TTS or browser speech synthesis
+  └─ response → /api/speak → voice-service Speaking → WAV played in the browser
 ```
 
 Key files:
@@ -124,7 +115,8 @@ Key files:
 server.py       local HTTP API and NDJSON streaming
 runtime.py      Hermes CLI subprocess and session continuity
 commands.py     dashboard slash commands and mission queue
-voice.py        optional ElevenLabs STT/TTS proxy
+voice.py        client for the local voice-service (Hearing and Speaking)
+voice_service/  the local voice-service itself
 persona.md      concise spoken JARVIS persona
 ui/             dependency-free HTML/CSS/JavaScript HUD
 install.sh      first-run setup and launch
@@ -138,7 +130,7 @@ start.sh        local launcher
 - Agent runs are serialized so multiple tabs cannot race the shared Hermes session.
 - Raw prompt logging is disabled unless `JARVIS_RAW_LOG` is explicitly configured; opt-in logs are created with mode `0600` and symlink protection.
 - `.env`, state files, Python caches, and local credentials are ignored by Git.
-- The dashboard never bundles Google, Zapier, Gmail, ElevenLabs, or Hermes credentials.
+- The dashboard never bundles Google, Zapier, Gmail, or Hermes credentials.
 - Connected apps remain owned and authenticated by the user's Hermes profile.
 - Review third-party skills and MCP servers before installing them.
 
@@ -168,7 +160,7 @@ Then set `HERMES_CMD` in `.env` if needed.
 
 ### Microphone does not activate
 
-Allow microphone access for `127.0.0.1` in the browser's site settings. ElevenLabs is optional; without it, use a browser that supports Web Speech APIs.
+Allow microphone access for `127.0.0.1` in the browser's site settings. If the VOICE button says VOICE OFFLINE, start the voice-service.
 
 ### A newly connected tool is missing
 

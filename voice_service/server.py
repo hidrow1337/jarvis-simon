@@ -1,4 +1,4 @@
-"""HTTP front of the voice-service: /health and /hear."""
+"""HTTP front of the voice-service: /health, /hear and /speak."""
 import json
 import os
 import subprocess
@@ -9,6 +9,7 @@ from urllib.parse import urlparse
 
 HOST = "127.0.0.1"           # never the network: nobody else may use the models
 MAX_AUDIO_BODY = 12 * 1024 * 1024
+MAX_JSON_BODY = 1024 * 1024
 FFMPEG_TIMEOUT = 30
 
 # what the browser's MediaRecorder sends -> a file suffix ffmpeg can probe
@@ -87,22 +88,43 @@ def make_server(port, hearing, speaking, voice):
                     device=hearing.device))
             return self._json({"error": "no such endpoint"}, 404)
 
-        def do_POST(self):
-            if not self._host_ok():
-                return self._json({"error": "invalid host"}, 403)
-            if urlparse(self.path).path != "/hear":
-                return self._json({"error": "no such endpoint"}, 404)
-            mime = self.headers.get("Content-Type", "").split(";", 1)[0].strip().lower()
-            if not mime.startswith("audio/"):
-                return self._json({"error": "audio content type required"}, 415)
+        def _wav(self, data):
+            self.send_response(200)
+            self.send_header("Content-Type", "audio/wav")
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(data)
+
+        def _body(self, limit):
+            """The request body, or None after answering 413."""
             try:
                 n = int(self.headers.get("Content-Length", 0))
             except ValueError:
                 n = -1
-            if n < 0 or n > MAX_AUDIO_BODY:
+            if n < 0 or n > limit:
                 self.close_connection = True
-                return self._json({"error": "request body too large"}, 413)
-            audio = self.rfile.read(n) if n else b""
+                self._json({"error": "request body too large"}, 413)
+                return None
+            return self.rfile.read(n) if n else b""
+
+        def do_POST(self):
+            if not self._host_ok():
+                return self._json({"error": "invalid host"}, 403)
+            path = urlparse(self.path).path
+            mime = self.headers.get("Content-Type", "").split(";", 1)[0].strip().lower()
+            if path == "/hear":
+                return self._hear(mime)
+            if path == "/speak":
+                return self._speak(mime)
+            return self._json({"error": "no such endpoint"}, 404)
+
+        def _hear(self, mime):
+            if not mime.startswith("audio/"):
+                return self._json({"error": "audio content type required"}, 415)
+            audio = self._body(MAX_AUDIO_BODY)
+            if audio is None:
+                return
             try:
                 wav = to_wav16k(audio, mime)
                 with model_lock:
@@ -114,5 +136,25 @@ def make_server(port, hearing, speaking, voice):
             except Exception as e:                        # noqa: BLE001
                 return self._json({"error": f"Hearing model failed: {e}"[:300]}, 500)
             return self._json({"text": (text or "").strip()})
+
+        def _speak(self, mime):
+            if mime != "application/json":
+                return self._json({"error": "application/json required"}, 415)
+            raw = self._body(MAX_JSON_BODY)
+            if raw is None:
+                return
+            try:
+                text = json.loads(raw or b"{}").get("text")
+            except (ValueError, AttributeError):
+                return self._json({"error": "bad json"}, 400)
+            text = text.strip() if isinstance(text, str) else ""
+            if not text:
+                return self._json({"error": "empty text"}, 400)
+            try:
+                with model_lock:
+                    wav = speaking.speak(text)
+            except Exception as e:                        # noqa: BLE001
+                return self._json({"error": f"Speaking model failed: {e}"[:300]}, 500)
+            return self._wav(wav)
 
     return ThreadingHTTPServer((HOST, port), Handler)
