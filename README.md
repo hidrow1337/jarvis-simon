@@ -42,7 +42,7 @@ En **Turn** er én udveksling: du taler, Jarvis hører det, Hermes svarer, og Ja
 Dashboardet starter Hermes' CLI direkte fra Windows, så Hermes skal være installeret **native på Windows** og kunne køres fra PowerShell. Det er ikke nok at have Hermes i WSL. Har du allerede en fungerende Hermes, kan du springe installationen over. Ellers installerer du Hermes Agent efter [Hermes' egen vejledning](https://hermes-agent.nousresearch.com/docs/) og kører `hermes setup`. Tjek i PowerShell, at Hermes svarer, før du går videre:
 
 ```powershell
-hermes chat -q "Say online"
+hermes chat -Q -q "Say online"
 ```
 
 Ligger `hermes` ikke på PATH, så find den fulde sti med `where.exe hermes`, og sæt den i `HERMES_CMD` nedenfor, som den står, fx `HERMES_CMD=C:\Users\<dig>\AppData\Local\hermes\hermes.exe`. Mellemrum i stien er fine (`HERMES_CMD=C:\Program Files\Hermes\hermes.exe`). Kommer der argumenter efter en sti med mellemrum, så sæt anførselstegn om stien: `HERMES_CMD="C:\Program Files\Python312\python.exe" -m hermes_cli.main`.
@@ -328,7 +328,7 @@ Til installation og start af voice-servicen kan du desuden sætte, i WSL-termina
 | `JARVIS_PERMISSION` | `normal` | Vises i HUD'en og banneret. Hvad Hermes må uden at spørge, styres i Hermes selv. (`HERMES_PERMISSION` virker også.) |
 | `JARVIS_MODEL` | Hermes' default | Model, der gives videre til Hermes med `--model`. |
 | `HERMES_TOOLSETS` | alle | Begræns Hermes til bestemte toolsets (`--toolsets`). |
-| `HERMES_SOURCE` | `jarvis-dashboard` | Kilden, Hermes registrerer kørsler under. |
+| `HERMES_SOURCE` | `tool` | Kilden, Hermes registrerer kørsler under. Hermes afviser kilder, den ikke kender; `tool` er den, Hermes anbefaler til integrationer som dashboardet. |
 | `JARVIS_RUNTIME` | `auto` | `auto` bruger Hermes, hvis den kan startes, ellers en mock. `hermes` eller `mock` tvinger det ene. |
 | `JARVIS_STATE` | `state.json` i repoet | Fil til missionskø og mål. |
 | `JARVIS_RAW_LOG` | (slået fra) | Sti til en log over rå prompts. Kun når du selv slår det til. Oprettes med rettigheder `0600`. |

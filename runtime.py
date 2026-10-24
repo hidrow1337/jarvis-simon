@@ -1,4 +1,4 @@
-"""
+r"""
 Hermes runtime for the JARVIS HUD.
 
 This dashboard is a face on Hermes Agent, not Claude Code. It launches the
@@ -32,7 +32,7 @@ _CLI_NOISE = re.compile(
 
 MODEL = os.environ.get("JARVIS_MODEL", "").strip()
 PROFILE = os.environ.get("HERMES_PROFILE", os.environ.get("JARVIS_PROFILE", "default")).strip() or "default"
-SOURCE = os.environ.get("HERMES_SOURCE", "jarvis-dashboard").strip() or "jarvis-dashboard"
+SOURCE = os.environ.get("HERMES_SOURCE", "tool").strip() or "tool"
 WORKDIR = os.path.expanduser(os.environ.get("JARVIS_WORKDIR", os.getcwd()))
 PERMISSION = os.environ.get("JARVIS_PERMISSION", os.environ.get("HERMES_PERMISSION", "normal")).strip().lower()
 RUNTIME = os.environ.get("JARVIS_RUNTIME", "auto").strip().lower()  # auto|hermes|mock
@@ -100,7 +100,10 @@ def _hermes_base():
 def _can_launch_hermes():
     try:
         base = _hermes_base()
-        proc = subprocess.run(base + ["--version"], cwd=WORKDIR, text=True,
+        # Hermes writes UTF-8 whatever the locale; Windows' default (cp1252) can't
+        # read it, so every Hermes call says so.
+        proc = subprocess.run(base + ["--version"], cwd=WORKDIR,
+                              text=True, encoding="utf-8", errors="replace",
                               stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                               timeout=12)
         out = (proc.stdout or proc.stderr).strip()
@@ -152,7 +155,8 @@ def hermes_tools_snapshot(limit=36):
     """Return a compact list of enabled/visible Hermes toolsets/tools for UI status."""
     try:
         base = _hermes_base()
-        proc = subprocess.run(base + ["tools", "list"], cwd=WORKDIR, text=True,
+        proc = subprocess.run(base + ["tools", "list"], cwd=WORKDIR,
+                              text=True, encoding="utf-8", errors="replace",
                               stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                               timeout=20)
         out = (proc.stdout or proc.stderr or "").strip()
@@ -186,7 +190,7 @@ def _run_hermes_locked(message, session_id=None, system=None):
     child_env = dict(os.environ)
     # Ensure GUI-started shells can still find common Homebrew/user installs.
     home = os.path.expanduser("~")
-    child_env["PATH"] = ":".join(dict.fromkeys([
+    child_env["PATH"] = os.pathsep.join(dict.fromkeys([
         child_env.get("PATH", ""),
         "/opt/homebrew/bin", "/usr/local/bin",
         os.path.join(home, ".local", "bin"),
@@ -195,7 +199,8 @@ def _run_hermes_locked(message, session_id=None, system=None):
     ]))
 
     try:
-        proc = subprocess.Popen(cmd, cwd=WORKDIR, text=True, bufsize=1,
+        proc = subprocess.Popen(cmd, cwd=WORKDIR, bufsize=1,
+                                text=True, encoding="utf-8", errors="replace",
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                 env=child_env)
         with _ACTIVE_LOCK:
