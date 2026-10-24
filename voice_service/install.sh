@@ -13,7 +13,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 venv="${JARVIS_VOICE_VENV:-$HOME/.venvs/jarvis-voice}"
 cuda="${JARVIS_TORCH_CUDA:-cu128}"
-voice="${JARVIS_VOICE:-$(sed -n 's/^JARVIS_VOICE=//p' ../.env 2>/dev/null | tail -n1 | tr -d "\"' ")}"
+voice="${JARVIS_VOICE:-$(sed -n 's/^JARVIS_VOICE=//p' ../.env 2>/dev/null | tail -n1 | tr -d "\"' \r")}"
 voice="${voice:-bm_george}"
 
 say() { printf '  voice-service install · %s\n' "$*"; }

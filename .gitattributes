@@ -1,0 +1,3 @@
+# The scripts run in bash (WSL, macOS, Linux) even when the checkout is made on
+# Windows, where Git would otherwise give them CRLF and break the shebang.
+*.sh text eol=lf
