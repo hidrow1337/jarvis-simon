@@ -1,0 +1,5 @@
+# The voice-service's own environment (never the dashboard's). install.sh puts
+# the CUDA build of torch in first, then these.
+
+# Hearing model: Parakeet TDT 0.6B v3
+nemo_toolkit[asr]>=2.4

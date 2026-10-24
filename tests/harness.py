@@ -183,20 +183,47 @@ FAKE_HEARD = "the fake hearing model heard you"
 
 class VoiceService(_ServerProcess):
     """The real voice-service, with fake Hearing and Speaking models injected.
-    The fake Hearing model answers FAKE_HEARD for any 16 kHz mono WAV."""
+    The fake Hearing model answers FAKE_HEARD for any 16 kHz mono WAV.
+    `hearing="parakeet"` runs the real Hearing model instead (with stub_env(),
+    against the stub NeMo)."""
 
     name = "voice-service"
     ready_path = "/health"
 
-    def __init__(self, env=None):
+    def __init__(self, env=None, hearing="fake"):
         super().__init__(env)
+        self.hearing = hearing
         self.url = f"http://127.0.0.1:{self.port}"
 
     def argv(self):
         return [sys.executable, "-m", "voice_service",
-                "--port", str(self.port), "--hearing", "fake", "--speaking", "fake",
-                "--fake-heard", FAKE_HEARD]
+                "--hearing", self.hearing, "--speaking", "fake", "--fake-heard", FAKE_HEARD]
 
+    def child_env(self, tmp):
+        # the same setting the dashboard reads; the service listens on its port
+        return {"JARVIS_VOICE_URL": self.url}
+
+
+def run_voice_service(*args, env=None, timeout=60):
+    """Runs `python3 -m voice_service <args>` to completion and returns the
+    CompletedProcess (text stdout/stderr). Inherited JARVIS_* variables are
+    dropped, as for the servers."""
+    full_env = {k: v for k, v in os.environ.items() if not k.startswith(_OWN_ENV)}
+    full_env["PYTHONUNBUFFERED"] = "1"
+    full_env.update(env or {})
+    return subprocess.run([sys.executable, "-m", "voice_service", *args],
+                          cwd=ROOT, env=full_env, capture_output=True, text=True,
+                          timeout=timeout)
+
+
+STUBS = ROOT / "tests" / "stubs"
+
+
+def stub_env(**env):
+    """Environment that puts the stub torch and NeMo packages (tests/stubs) on
+    the voice-service's import path, plus `env`. CPU is not allowed unless
+    `env` says so, whatever the repo's .env holds."""
+    return {"PYTHONPATH": str(STUBS), "JARVIS_VOICE_ALLOW_CPU": "0", **env}
 
 
 def audio_clip(fmt, seconds=1.0):
