@@ -6,3 +6,6 @@ nemo_toolkit[asr]>=2.4
 
 # Speaking model: Kokoro-82M (with misaki's English G2P)
 kokoro>=0.9.4
+# preshed 3.0.14 breaks spaCy 3.8's tokenizer ("OverflowError: Python int too
+# large to convert to C ssize_t" loading en_core_web_sm), so misaki can't start
+preshed<3.0.14
