@@ -32,20 +32,20 @@ En **Turn** er én udveksling: du taler, Jarvis hører det, Hermes svarer, og Ja
 - Windows 10 eller 11 med et NVIDIA-kort (udviklet til RTX 4070 med 12 GB) og en nyere NVIDIA-driver installeret **i Windows**.
 - [Git for Windows](https://git-scm.com/download/win) og Python 3 på Windows (`python --version` i PowerShell).
 - En Chromium-browser: Chrome, Edge eller Brave.
-- Ca. 10 GB fri disk i WSL til venv og modeller.
+- Ca. 20 GB fri disk på C: til WSL: torch med CUDA, NeMo, Kokoro, pip-cache og modellerne. Tallet er et skøn.
 - Internet første gang, til at hente pakker og modeller.
 
 ## 1. Hermes og dashboardet på Windows
 
 ### Hermes
 
-Installér Hermes Agent efter [Hermes' egen vejledning](https://hermes-agent.nousresearch.com/docs/), og kør `hermes setup`. Tjek i PowerShell, at Hermes svarer, før du går videre:
+Dashboardet starter Hermes' CLI direkte fra Windows, så Hermes skal være installeret **native på Windows** og kunne køres fra PowerShell. Det er ikke nok at have Hermes i WSL. Har du allerede en fungerende Hermes, kan du springe installationen over. Ellers installerer du Hermes Agent efter [Hermes' egen vejledning](https://hermes-agent.nousresearch.com/docs/) og kører `hermes setup`. Tjek i PowerShell, at Hermes svarer, før du går videre:
 
 ```powershell
 hermes chat -q "Say online"
 ```
 
-Ligger `hermes` ikke på PATH, så notér den fulde sti. Den skal i `HERMES_CMD` nedenfor.
+Ligger `hermes` ikke på PATH, så find den fulde sti med `where.exe hermes`. Den skal i `HERMES_CMD` nedenfor, **med `/` i stedet for `\`** (fx `HERMES_CMD=C:/Users/<dig>/AppData/Local/hermes/hermes.exe`). Dashboardet deler værdien op som en shell-kommando, så backslashes forsvinder, og en sti med mellemrum bliver delt op. Står Hermes i en mappe med mellemrum, så flyt den, eller læg mappen på PATH i stedet.
 
 ### Dashboardet
 
@@ -128,7 +128,7 @@ Voice-servicen bruger ffmpeg til at omkode browserens optagelse. NeMo kræver Py
 
 ### Installation
 
-Windows-drevet ligger under `/mnt/c` i WSL. Gå til den samme mappe som dashboardet, og kør installationen:
+Windows-drevet ligger under `/mnt/c` i WSL. Gå til den samme mappe som dashboardet, og kør installationen. Har dit Windows-brugernavn et mellemrum, så sæt stien i anførselstegn: `cd "/mnt/c/Users/Fornavn Efternavn/jarvis-simon"`.
 
 ```bash
 cd /mnt/c/Users/<dig>/jarvis-simon
@@ -249,12 +249,12 @@ Browseren åbner <http://localhost:8730>. Øverst står `Local voice: Parakeet-t
 
 1. Tryk **◉ VOICE**. Første gang spørger browseren om mikrofonen; tillad den for `localhost`.
 2. Knappen skifter til **● VOICE LIVE**. Tal på engelsk.
-3. Hold en kort pause, når du er færdig. Jarvis opdager stilheden, sender optagelsen til Hearing og viser i loggen `heard in … ms: "…"`.
+3. Hold en kort pause, når du er færdig. Jarvis opdager stilheden, sender optagelsen til Hearing og viser i loggen `heard in …ms: "…"`.
 4. Teksten går til Hermes, og svaret bliver sagt højt. Mens Jarvis taler, lytter den ikke, så den ikke hører sig selv. Lange svar bliver afkortet, før de bliver sagt.
 5. Bagefter lytter Jarvis igen. Bliver der ikke hørt noget (støj, for kort optagelse), lytter den bare videre.
 6. Tryk på knappen igen, eller tryk `Esc`, for at lukke samtalen. Kører Hermes stadig, afbryder `Esc` først det kørende svar.
 
-🔊-knappen slår Speaking fra og til. Du kan altid skrive i feltet og sende med `Ctrl+Enter`, også mens voice er offline.
+🔊-knappen slår Speaking fra og til. Du kan altid skrive i feltet og sende med `Ctrl+Enter`, også mens voice-servicen er offline.
 
 **4. Stop:** `Ctrl+C` i begge vinduer.
 
@@ -265,17 +265,19 @@ Alle knapper i kommandomatricen kører deres kommando med det samme. Kommandoer,
 | Kommando | Gør |
 |---|---|
 | `/new` | Start en ny Hermes-tråd |
+| `/clear` | Ryd svarpanelet (Hermes-sessionen fortsætter) |
 | `/goal <text\|status\|clear>` | Sæt, læs eller ryd det stående mål |
 | `/tools` | Kør `hermes tools list` |
 | `/browser <task>` | Bed Hermes bruge sine browser-/Chrome-tools |
 | `/background <mission>` | Kør en mission i baggrunden |
-| `/mission [task]` | Læs eller tilføj til den lokale missionskø |
+| `/mission [task]` | Læs eller tilføj til den lokale missionskø (`/kanban` gør det samme) |
+| `/profile [note]` | Læs eller tilføj noter om dig, som Jarvis husker |
 | `/personality <tone>` | Læs eller skift JARVIS' tone |
 | `/commands` | Vis alle dashboard-kommandoer |
 | `/toolsets` | Opsummér de aktive Hermes-toolsets |
 | `/connectors` | Forklar hvordan integrationer arves fra Hermes |
 | `/connect <name>` | Bed Hermes om vejledning til at forbinde en integration |
-| `/status` | Vis runtime, profil og voice-status |
+| `/status` | Vis runtime, profil og voice-servicens status |
 
 Almindelig tekst og tale går direkte til Hermes.
 
@@ -318,7 +320,7 @@ Til installation og start af voice-servicen kan du desuden sætte, i WSL-termina
 | Indstilling | Default | Betydning |
 |---|---|---|
 | `HERMES_PROFILE` | `default` | Hermes-profilen, hvis tools, skills, hukommelse, browser og MCP-servere bruges. (`JARVIS_PROFILE` virker også.) |
-| `HERMES_CMD` | `hermes` på PATH | Fuld kommando til Hermes, hvis den ikke ligger på PATH. |
+| `HERMES_CMD` | `hermes` på PATH | Fuld kommando til Hermes, hvis den ikke ligger på PATH. Brug `/` i Windows-stier og ingen mellemrum (se [Hermes](#hermes)). |
 | `JARVIS_WORKDIR` | `~` (i `.env.example`) | Hermes' arbejdsmappe. `~` er din brugermappe. Uden indstillingen er det mappen, dashboardet startes fra. |
 | `JARVIS_PORT` | `8730` | Dashboardets port. |
 | `JARVIS_OPEN` | `1` | `0` åbner ikke browseren ved start. |
@@ -339,7 +341,7 @@ Til installation og start af voice-servicen kan du desuden sætte, i WSL-termina
 Tjek de tre dele hver for sig, i denne rækkefølge:
 
 1. **Dashboardet:** kører `python server.py` stadig i PowerShell, og åbner <http://localhost:8730>? Svarer `curl.exe http://127.0.0.1:8730/api/status` med JSON? Hvis ikke, er det dashboardet (eller porten; se `JARVIS_PORT`).
-2. **Hermes:** banneret og `/api/status` siger `runtime: hermes`. Står der `mock` eller `Hermes offline` i HUD'en, er det Hermes; se [Hermes svarer ikke](#hermes-svarer-ikke).
+2. **Hermes:** banneret siger `brain  Hermes Agent (…)`, og `/api/status` siger `"runtime": "hermes"`. Står der `MOCK` i banneret eller `Hermes offline` i HUD'en, er det Hermes; se [Hermes svarer ikke](#hermes-svarer-ikke).
 3. **Voice-servicen:** står der `ready on http://127.0.0.1:8731` i WSL-terminalen, og svarer `curl.exe http://127.0.0.1:8731/health` fra PowerShell med `"ready": true`? Hvis ikke, er det voice-servicen eller forbindelsen mellem Windows og WSL.
 
 Fejl i en Turn står i HUD'ens log: `Hearing failed: …` eller `Speaking failed: …` med voice-servicens egen begrundelse. Mere står i voice-servicens terminal.
@@ -357,14 +359,17 @@ Dashboardet tjekker igen hvert 4. sekund og når du trykker VOICE, så knappen b
 
 ### WSL localhost-forwarding
 
-Virker `curl http://127.0.0.1:8731/health` inde i WSL, men ikke `curl.exe http://127.0.0.1:8731/health` i PowerShell, så videresender WSL ikke localhost til Windows. Det er slået til som standard, men kan være slået fra i `%UserProfile%\.wslconfig`. Åbn eller opret filen, og sørg for at den indeholder:
+Virker `curl http://127.0.0.1:8731/health` inde i WSL, men ikke `curl.exe http://127.0.0.1:8731/health` i PowerShell, så videresender WSL ikke localhost til Windows. Det styres af `%UserProfile%\.wslconfig`. Åbn filen, hvis den findes, og se på linjen `networkingMode` under `[wsl2]`:
+
+- **Ingen `networkingMode`, eller `networkingMode=nat`** (standard): her virker localhost kun med `localhostForwarding`, som er slået til, medmindre filen slår den fra. Sørg for, at filen indeholder:
 
 ```ini
 [wsl2]
 localhostForwarding=true
 ```
 
-Alternativt kan du bruge "mirrored" netværk, hvor WSL deler Windows' netværk direkte (Windows 11 22H2 og nyere):
+- **Enhver anden værdi end `nat` eller `mirrored`**: localhost når ikke WSL. Fjern linjen (så bruges NAT med forwarding), eller skift til mirrored.
+- **Mirrored** (Windows 11 22H2 og nyere): WSL deler Windows' netværk direkte, og `localhostForwarding` bruges ikke:
 
 ```ini
 [wsl2]
@@ -415,7 +420,8 @@ Tjek `hermes tools list`, genstart dashboardet, og tryk `/new`.
 | `NeMo needs Python 3.10–3.12` | Brug Ubuntu 22.04 eller 24.04, hvis Python ligger i det interval. |
 | `no venv at … — run voice_service/install.sh first` | Kør `voice_service/install.sh`, eller sæt `JARVIS_VOICE_VENV`, hvis venv'et ligger et andet sted. |
 | `… is not an English Kokoro Voice` | Vælg en Voice, der starter med `af_`, `am_`, `bf_` eller `bm_`. |
-| `env: 'bash\r': No such file or directory` | Scriptet har fået Windows-linjeskift. Repoet tvinger LF på `.sh`-filer; klon det igen med en nyere version. |
+| `env: 'bash\r': No such file or directory` | Scriptet har fået Windows-linjeskift. Repoet tvinger LF på `.sh`-filer, men en klon, der blev lavet før det, retter sig ikke selv ved `git pull`. Slet scripts og hent dem igen, i PowerShell i repoet: `Remove-Item *.sh, voice_service\*.sh; git checkout -- '*.sh'` |
+| Indlæsningen stopper med `Killed` | WSL er løbet tør for RAM. Som standard får WSL halvdelen af maskinens RAM. Giv den mere med `memory=12GB` under `[wsl2]` i `%UserProfile%\.wslconfig`, og kør `wsl --shutdown`. |
 
 ## Sikkerhed
 
@@ -424,13 +430,13 @@ Tjek `hermes tools list`, genstart dashboardet, og tryk `/new`.
 - Alle ændrende API-kald kræver et tilfældigt token pr. start, samme origin, gyldig localhost-host, godkendt content-type og begrænset størrelse.
 - Hermes-kørsler køres én ad gangen, så flere faner ikke kan køre i den samme Hermes-session samtidig.
 - Rå prompts logges ikke, medmindre `JARVIS_RAW_LOG` er sat. Logfilen oprettes med `0600` og beskyttelse mod symlinks.
-- `.env`, state-filer, Python-caches og lokale nøgler er udelukket fra Git.
+- `.env`, `state.json` og Python-caches er udelukket fra Git. Sætter du `JARVIS_STATE` eller `JARVIS_RAW_LOG` til en fil i repoet, skal du selv holde den ude af Git.
 - Dashboardet indeholder ingen nøgler til Google, Zapier, Gmail eller Hermes. Forbundne apps ejes og godkendes af din Hermes-profil.
 - Gennemgå tredjeparts-skills og MCP-servere, før du installerer dem.
 
 ## For udviklere
 
-Testene kører med Pythons standardbibliotek og ffmpeg, uden GPU, torch eller NeMo (de rigtige modeller er erstattet af fakes og stubs):
+Testene kører med Pythons standardbibliotek og ffmpeg, uden GPU, torch eller NeMo. De går gennem dashboardets HTTP-API mod en rigtig voice-service, hvor modellerne er erstattet af fakes og stubs:
 
 ```bash
 python3 -m unittest
@@ -446,7 +452,7 @@ voice.py         klient til den lokale voice-service (Hearing og Speaking)
 voice_service/   voice-servicen: HTTP-server, modeller, install.sh og start.sh
 persona.md       JARVIS' korte, talte persona
 ui/              HUD i HTML/CSS/JavaScript uden afhængigheder
-tests/           Seam 1-tests gennem dashboardets HTTP-API
+tests/           tests gennem dashboardets HTTP-API og voice-servicens kommandoer
 ```
 
 ## Credit og licens

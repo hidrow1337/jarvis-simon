@@ -13,6 +13,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 venv="${JARVIS_VOICE_VENV:-$HOME/.venvs/jarvis-voice}"
 cuda="${JARVIS_TORCH_CUDA:-cu128}"
+# \r too: a .env copied on Windows has CRLF line ends
 voice="${JARVIS_VOICE:-$(sed -n 's/^JARVIS_VOICE=//p' ../.env 2>/dev/null | tail -n1 | tr -d "\"' \r")}"
 voice="${voice:-bm_george}"
 
