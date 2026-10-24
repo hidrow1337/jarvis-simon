@@ -8,7 +8,7 @@ from tests.harness import (Dashboard, VoiceService, audio_clip, free_port,
 
 
 class HearCommandTest(unittest.TestCase):
-    def test_hear_prints_the_transcription_and_how_long_hearing_took(self):
+    def test_hear_prints_what_was_heard_and_how_long_hearing_took(self):
         with tempfile.TemporaryDirectory() as tmp:
             clip = pathlib.Path(tmp, "clip.webm")
             clip.write_bytes(audio_clip("webm"))

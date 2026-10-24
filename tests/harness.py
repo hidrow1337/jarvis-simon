@@ -31,6 +31,16 @@ _TOKEN_META = re.compile(rb'<meta name="jarvis-token" content="([^"]+)">')
 _OWN_ENV = ("JARVIS_", "HERMES_")
 
 
+def _clean_env(*overrides):
+    """This process's environment minus the project's own variables, plus
+    `overrides` in order."""
+    env = {k: v for k, v in os.environ.items() if not k.startswith(_OWN_ENV)}
+    env["PYTHONUNBUFFERED"] = "1"
+    for o in overrides:
+        env.update(o or {})
+    return env
+
+
 def free_port():
     # Racy (the port is free again before server.py binds it), but good enough
     # for tests; a stolen port shows up as "dashboard exited early".
@@ -74,10 +84,7 @@ class _ServerProcess:
 
     def start(self, timeout=10):
         self._tmp = tempfile.TemporaryDirectory()
-        env = {k: v for k, v in os.environ.items() if not k.startswith(_OWN_ENV)}
-        env["PYTHONUNBUFFERED"] = "1"
-        env.update(self.child_env(self._tmp.name))
-        env.update(self._env)
+        env = _clean_env(self.child_env(self._tmp.name), self._env)
         self._log = open(os.path.join(self._tmp.name, "server.log"), "w+b")
         self._proc = subprocess.Popen(
             self.argv(), cwd=ROOT, env=env,
@@ -208,11 +215,8 @@ def run_voice_service(*args, env=None, timeout=60):
     """Runs `python3 -m voice_service <args>` to completion and returns the
     CompletedProcess (text stdout/stderr). Inherited JARVIS_* variables are
     dropped, as for the servers."""
-    full_env = {k: v for k, v in os.environ.items() if not k.startswith(_OWN_ENV)}
-    full_env["PYTHONUNBUFFERED"] = "1"
-    full_env.update(env or {})
     return subprocess.run([sys.executable, "-m", "voice_service", *args],
-                          cwd=ROOT, env=full_env, capture_output=True, text=True,
+                          cwd=ROOT, env=_clean_env(env), capture_output=True, text=True,
                           timeout=timeout)
 
 

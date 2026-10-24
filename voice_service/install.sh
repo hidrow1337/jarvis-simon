@@ -47,10 +47,14 @@ fi
 pip=("$venv/bin/python" -m pip)
 "${pip[@]}" install --upgrade pip wheel
 say "installing torch ($cuda build)"
-"${pip[@]}" install --upgrade torch --index-url "https://download.pytorch.org/whl/$cuda"
+"${pip[@]}" install --upgrade torch torchaudio --index-url "https://download.pytorch.org/whl/$cuda"
 "${pip[@]}" install --upgrade Cython packaging
 say "installing NeMo (this takes a while)"
-"${pip[@]}" install --upgrade -r requirements.txt
+# hold torch at the CUDA build just installed: if NeMo wants another one, fail
+# loudly here rather than quietly swap in a different build from PyPI
+pins="$(mktemp)"; trap 'rm -f "$pins"' EXIT
+"${pip[@]}" freeze | grep -E '^(torch|torchaudio)==' > "$pins"
+"${pip[@]}" install --upgrade -r requirements.txt -c "$pins"
 
 "$venv/bin/python" - <<'PY'
 import torch

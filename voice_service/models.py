@@ -53,15 +53,15 @@ class FakeSpeaking:
 def _not_yet(model):
     def load(args):
         raise RuntimeError(f"the real {model} model is not wired up yet — "
-                           f"run with fakes (--hearing fake --speaking fake)")
+                           f"run with --speaking fake for now")
     return load
 
 
 _device = None
 
 
-def device(args):
-    """"cuda" if torch sees a GPU, else "cpu" when args.allow_cpu, else raises:
+def pick_device(allow_cpu):
+    """"cuda" if torch sees a GPU, else "cpu" when allow_cpu, else raises:
     a Jarvis silently running on CPU is too slow to talk to. Decided once and
     shared by every real model."""
     global _device
@@ -75,7 +75,7 @@ def device(args):
             _device = "cuda"
             print(f"  voice-service · device cuda ({torch.cuda.get_device_name(0)})",
                   flush=True)
-        elif args.allow_cpu:
+        elif allow_cpu:
             _device = "cpu"
             print("  voice-service · device cpu (CUDA not available; "
                   "JARVIS_VOICE_ALLOW_CPU=1) — expect slow Hearing", flush=True)
@@ -101,11 +101,8 @@ class Parakeet:
         except ImportError:
             raise RuntimeError("NeMo is not installed in this environment — "
                                "run voice_service/install.sh") from None
-        try:                    # NeMo logs every config key at INFO on load
-            from nemo.utils import logging as nemo_logging
-            nemo_logging.setLevel(logging.WARNING)
-        except ImportError:
-            pass
+        from nemo.utils import logging as nemo_logging
+        nemo_logging.setLevel(logging.WARNING)   # else every config key at INFO on load
         self.device = device
         self._model = nemo_asr.models.ASRModel.from_pretrained(
             model_name=PARAKEET, map_location=torch.device(device)).eval()
@@ -135,7 +132,7 @@ def _silence(rate, seconds):
 
 
 def load_parakeet(args):
-    return Parakeet(device(args))
+    return Parakeet(pick_device(args.allow_cpu))
 
 
 # name -> loader(args). Real loaders do their heavy imports inside.
