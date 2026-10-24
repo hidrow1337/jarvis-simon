@@ -6,6 +6,8 @@ Stemmen kører helt lokalt på din egen GPU: **Hearing** (din tale → tekst) me
 
 ![JARVIS Hermes dashboard](docs/screenshot.png)
 
+Første gang følger du trin 1–4 nedenfor. Når alt er installeret, står det daglige under [Start det hele](#start-det-hele).
+
 ## Sådan hænger det sammen
 
 ```text
@@ -32,7 +34,7 @@ En **Turn** er én udveksling: du taler, Jarvis hører det, Hermes svarer, og Ja
 - Windows 10 eller 11 med et NVIDIA-kort (udviklet til RTX 4070 med 12 GB) og en nyere NVIDIA-driver installeret **i Windows**.
 - [Git for Windows](https://git-scm.com/download/win) og Python 3 på Windows (`python --version` i PowerShell).
 - En Chromium-browser: Chrome, Edge eller Brave.
-- Ca. 20 GB fri disk på C: til WSL: torch med CUDA, NeMo, Kokoro, pip-cache og modellerne. Tallet er et skøn.
+- Ca. 25 GB fri disk på C: til WSL: torch med CUDA, NeMo, Kokoro, pip-cache og modellerne (Parakeet alene fylder ca. 5,5 GB). Tallet er et skøn.
 - Internet første gang, til at hente pakker og modeller.
 
 ## 1. Hermes og dashboardet på Windows
@@ -49,7 +51,7 @@ Ligger `hermes` ikke på PATH, så find den fulde sti med `where.exe hermes`, og
 
 ### Dashboardet
 
-Klon repoet på Windows-siden, fx i din brugermappe. WSL bruger den samme mappe senere, så `.env` deles af dashboardet og voice-servicen.
+Klon repoet på Windows-siden, fx i din brugermappe. WSL bruger den samme mappe senere, så `.env` deles af dashboardet og voice-servicen. Git kører du altid fra PowerShell, også `git pull`: Git i WSL ser Windows' linjeskift i klonen som lokale ændringer og nægter at opdatere.
 
 ```powershell
 cd $HOME
@@ -101,6 +103,8 @@ wsl -l -v
 
 `VERSION` skal være `2`. Hold WSL opdateret med `wsl --update`.
 
+Har du allerede en Ubuntu i WSL 2, kan du bruge den i stedet. En nyere Ubuntu med en Python over 3.12 virker også; se [ffmpeg og byggeværktøjer](#ffmpeg-og-byggeværktøjer).
+
 ### GPU'en i WSL
 
 Installér **ikke** en NVIDIA-driver inde i Ubuntu. I WSL2 kommer driveren fra Windows, og CUDA-delen af torch følger med voice-servicens installation. Tjek i Ubuntu-terminalen, at GPU'en kan ses:
@@ -124,6 +128,16 @@ python3 --version
 
 Voice-servicen bruger ffmpeg til at omkode browserens optagelse. NeMo kræver Python 3.10–3.12; Ubuntu 24.04 har 3.12.
 
+**Viser `python3 --version` 3.13 eller nyere** (fx 3.14 på Ubuntu 26.04), så lav voice-servicens venv med Python 3.12 via [uv](https://docs.astral.sh/uv/), før du går videre. uv henter selv Python 3.12 og rører ikke systemets Python:
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+export PATH="$HOME/.local/bin:$PATH"
+uv venv --seed --python 3.12 ~/.venvs/jarvis-voice
+```
+
+`install.sh` bruger derefter venv'ets Python 3.12. Du skal ikke aktivere venv'et.
+
 ## 3. Voice-servicen i WSL
 
 ### Installation
@@ -138,20 +152,25 @@ voice_service/install.sh
 Scriptet:
 
 1. tjekker for `python3`, `ffmpeg` og byggeværktøjer og siger præcis hvilken `apt`-kommando der mangler,
-2. viser hvilken GPU `nvidia-smi` ser,
-3. opretter voice-servicens eget venv i `~/.venvs/jarvis-voice` (uden for `/mnt/c`, som er langsomt),
-4. installerer torch med CUDA, NeMo og Kokoro. Det tager en del minutter,
-5. henter Hearing model (Parakeet, ca. 2,5 GB) og Speaking model (Kokoro, ca. 330 MB) plus din Voice.
+2. tjekker Python-versionen: venv'ets, hvis det findes, ellers systemets,
+3. viser hvilken GPU `nvidia-smi` ser,
+4. opretter voice-servicens eget venv i `~/.venvs/jarvis-voice` (uden for `/mnt/c`, som er langsomt), hvis det ikke findes,
+5. installerer torch med CUDA, NeMo og Kokoro. Første gang tager det en del minutter,
+6. henter Hearing model (Parakeet, ca. 5,5 GB) og Speaking model (Kokoro, ca. 330 MB) plus din Voice.
 
 Når det er gået godt, slutter det med noget i retning af:
 
 ```text
-  voice-service install · torch 2.x.x+cu128, CUDA available: NVIDIA GeForce RTX 4070
+  voice-service install · python 3.12 (python3)
+  voice-service install · GPU: GPU 0: NVIDIA GeForce RTX 4070 (UUID: …)
   ...
+  voice-service install · torch 2.x.x+cu128, CUDA available: NVIDIA GeForce RTX 4070
+  voice-service install · downloading the Hearing model (Parakeet TDT 0.6B v3, ~5.5 GB, cached)
+  voice-service install · downloading the Speaking model (Kokoro-82M, ~330 MB, cached) and Voice bm_george
   voice-service install · done. Start it with: voice_service/start.sh
 ```
 
-Står der `CUDA NOT available`, så se [CUDA ikke fundet](#cuda-ikke-fundet). Scriptet kan køres igen uden problemer; det genbruger venv'et.
+Linjer fra pip, NeMo (`OneLogger: …`) og Hugging Face (`unauthenticated requests … HF_TOKEN`) undervejs er normale. Står der en `Traceback` og `WARNING: download failed` lige før `done`, så er installationen **ikke** i orden, selvom den siger `done`: læs fejlen over linjen, for servicen vil fejle på samme måde, når den starter. Står der `CUDA NOT available`, så se [CUDA ikke fundet](#cuda-ikke-fundet). Scriptet kan køres igen uden problemer; det genbruger venv'et og hentede modeller, så anden gang går det hurtigt.
 
 ### Start
 
@@ -171,19 +190,29 @@ Loggen viser hvert trin:
   voice-service · ready on http://127.0.0.1:8731 · device cuda
 ```
 
-Servicen er klar, når linjen **`ready on http://127.0.0.1:8731`** kommer. Indtil da svarer den ikke, og dashboardet viser VOICE OFFLINE. Servicen nægter at starte uden CUDA, medmindre du selv har slået CPU til (se `JARVIS_VOICE_ALLOW_CPU`). Den lytter kun på `127.0.0.1`. `Ctrl+C` stopper den.
+Imellem står der en del advarsler fra NeMo (`[NeMo W …]` om validation config og dataloader). De handler om træning og kan ignoreres.
 
-Tjek fra **PowerShell**, at Windows kan nå den:
+Servicen er klar, når linjen **`ready on http://127.0.0.1:8731`** kommer. Indtil da svarer den ikke, og dashboardet viser VOICE OFFLINE. Servicen nægter at starte uden CUDA, medmindre du selv har slået CPU til (se `JARVIS_VOICE_ALLOW_CPU`). Den lytter kun på `127.0.0.1`. Lad terminalen stå åben; `Ctrl+C` stopper servicen.
+
+Tjek i to trin, at den kan nås. Først inde i WSL, i en **ny** Ubuntu-fane (servicen kører i den gamle):
+
+```bash
+curl http://127.0.0.1:8731/health
+```
+
+Derefter fra **PowerShell**. `--max-time 5` gør, at den giver op efter 5 sekunder i stedet for at hænge:
 
 ```powershell
-curl.exe http://127.0.0.1:8731/health
+curl.exe --max-time 5 http://127.0.0.1:8731/health
 ```
+
+Begge skal svare:
 
 ```json
 {"ready": true, "hearing_model": "parakeet-tdt-0.6b-v3", "speaking_model": "Kokoro-82M", "voice": "bm_george", "device": "cuda"}
 ```
 
-Virker det i WSL (`curl http://127.0.0.1:8731/health`) men ikke fra PowerShell, så se [WSL localhost-forwarding](#wsl-localhost-forwarding).
+Svarer WSL, men ikke PowerShell, så se [WSL localhost-forwarding](#wsl-localhost-forwarding). Svarer ingen af dem, så se på den sidste linje i servicens terminal.
 
 ## 4. Smoke-testen
 
@@ -223,29 +252,42 @@ voice_service/start.sh hear min-optagelse.webm
 
 Den printer transskriptionen og tiden for ffmpeg og Hearing. Filen kan være alt, ffmpeg kan læse.
 
-## Daglig brug
+## Start det hele
 
-Du skal bruge to vinduer: et WSL-terminalvindue til voice-servicen og et PowerShell-vindue til dashboardet. Rækkefølgen er ligegyldig; dashboardet opdager voice-servicen inden for 4 sekunder, uden reload.
+Når trin 1–4 er gjort én gang, er det her alt, du skal gøre hver gang. Du bruger to vinduer, og begge skal stå åbne, mens du bruger Jarvis. Rækkefølgen er ligegyldig: dashboardet opdager voice-servicen inden for 4 sekunder, uden reload.
 
-**1. WSL (Ubuntu-terminalen):**
+**1. Voice-servicen, i Ubuntu** (startmenuen, eller `wsl` i PowerShell):
 
 ```bash
 cd /mnt/c/Users/<dig>/jarvis-simon
 voice_service/start.sh
 ```
 
-Vent på `ready on http://127.0.0.1:8731`.
+Vent på `ready on http://127.0.0.1:8731`. Det tager typisk 20–30 sekunder.
 
-**2. Windows (PowerShell):**
+**2. Dashboardet, i PowerShell:**
 
 ```powershell
 cd $HOME\jarvis-simon
 python server.py
 ```
 
-Browseren åbner <http://localhost:8730>. Øverst står `Local voice: Parakeet-tdt-0.6b-v3 / Kokoro-82M · bm_george`, og knappen hedder **◉ VOICE**.
+Browseren åbner <http://localhost:8730>.
 
-**3. En samtale:**
+**3. Tjek, at alt er grønt.** Øverst til højre i dashboardet:
+
+- `Gateway: online` — dashboardet kører.
+- `Local voice: Parakeet-tdt-0.6b-v3 / Kokoro-82M · bm_george` — voice-servicen er nået. Står der `Voice: VOICE OFFLINE` efter 10 sekunder, så se ["VOICE OFFLINE"](#voice-offline).
+
+Knappen nederst til venstre hedder **◉ VOICE**, når stemmen er klar. Banneret i PowerShell skal sige `brain  Hermes Agent (…)`; står der `MOCK`, så se [Hermes svarer ikke](#hermes-svarer-ikke).
+
+**4. Stop:** `Ctrl+C` i begge vinduer.
+
+**Opdatering:** stop begge, kør `git pull` i **PowerShell** (ikke i WSL), og kør `voice_service/install.sh` i Ubuntu, hvis opdateringen ændrede noget i `voice_service/`. Start derefter som ovenfor.
+
+## Daglig brug
+
+**En samtale:**
 
 1. Tryk **◉ VOICE**. Første gang spørger browseren om mikrofonen; tillad den for `localhost`.
 2. Knappen skifter til **● VOICE LIVE**. Tal på engelsk.
@@ -255,8 +297,6 @@ Browseren åbner <http://localhost:8730>. Øverst står `Local voice: Parakeet-t
 6. Tryk på knappen igen, eller tryk `Esc`, for at lukke samtalen. Kører Hermes stadig, afbryder `Esc` først det kørende svar.
 
 🔊-knappen slår Speaking fra og til. Du kan altid skrive i feltet og sende med `Ctrl+Enter`, også mens voice-servicen er offline.
-
-**4. Stop:** `Ctrl+C` i begge vinduer.
 
 ### Kommandoer
 
@@ -417,7 +457,9 @@ Tjek `hermes tools list`, genstart dashboardet, og tryk `/new`.
 | Besked | Løsning |
 |---|---|
 | `missing: … sudo apt install -y …` | Kør den viste `apt`-kommando, og kør `install.sh` igen. |
-| `NeMo needs Python 3.10–3.12` | Brug Ubuntu 22.04 eller 24.04, hvis Python ligger i det interval. |
+| `NeMo needs Python 3.10–3.12, this is …` | Lav venv'et med Python 3.12 via uv, som beskrevet under [ffmpeg og byggeværktøjer](#ffmpeg-og-byggeværktøjer), og kør `install.sh` igen. |
+| `OverflowError: Python int too large to convert to C ssize_t` (fra spaCy, når Kokoro indlæses) | preshed 3.0.14 er installeret. `requirements.txt` holder den under 3.0.14, så hent den nyeste udgave (`git pull` i PowerShell), og kør `install.sh` igen. |
+| `git pull` i WSL: `Your local changes to the following files would be overwritten` | Kør `git pull` i PowerShell i stedet. Git i WSL ser Windows-klonens linjeskift som ændringer. |
 | `no venv at … — run voice_service/install.sh first` | Kør `voice_service/install.sh`, eller sæt `JARVIS_VOICE_VENV`, hvis venv'et ligger et andet sted. |
 | `… is not an English Kokoro Voice` | Vælg en Voice, der starter med `af_`, `am_`, `bf_` eller `bm_`. |
 | `env: 'bash\r': No such file or directory` | Scriptet har fået Windows-linjeskift. Repoet tvinger LF på `.sh`-filer, men en klon, der blev lavet før det, retter sig ikke selv ved `git pull`. Slet scripts og hent dem igen, i PowerShell i repoet: `Remove-Item *.sh, voice_service\*.sh; git checkout -- '*.sh'` |

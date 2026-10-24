@@ -13,8 +13,8 @@ set -euo pipefail
 cd "$(dirname "$0")"
 venv="${JARVIS_VOICE_VENV:-$HOME/.venvs/jarvis-voice}"
 cuda="${JARVIS_TORCH_CUDA:-cu128}"
-# \r too: a .env copied on Windows has CRLF line ends
-voice="${JARVIS_VOICE:-$(sed -n 's/^JARVIS_VOICE=//p' ../.env 2>/dev/null | tail -n1 | tr -d "\"' \r")}"
+# \r too: a .env copied on Windows has CRLF line ends. No .env is fine.
+voice="${JARVIS_VOICE:-$({ sed -n 's/^JARVIS_VOICE=//p' ../.env 2>/dev/null || true; } | tail -n1 | tr -d "\"' \r")}"
 voice="${voice:-bm_george}"
 
 say() { printf '  voice-service install · %s\n' "$*"; }
@@ -30,10 +30,15 @@ if [ ${#missing[@]} -gt 0 ]; then
 fi
 say "ffmpeg: $(command -v ffmpeg)"
 
-py="$(python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])')"
-python3 -c 'import sys; sys.exit(not (3, 10) <= sys.version_info[:2] <= (3, 12))' \
-  || die "NeMo needs Python 3.10–3.12, this is $py"
-say "python $py"
+# an existing venv decides the Python, e.g. one made with uv on a distro whose
+# own Python is newer than NeMo supports
+pyexe=python3
+[ -x "$venv/bin/python" ] && pyexe="$venv/bin/python"
+py="$("$pyexe" -c 'import sys; print("%d.%d" % sys.version_info[:2])')"
+"$pyexe" -c 'import sys; sys.exit(not (3, 10) <= sys.version_info[:2] <= (3, 12))' \
+  || die "NeMo needs Python 3.10–3.12, this is $py ($pyexe). Make the venv with 3.12 first:
+      uv venv --clear --seed --python 3.12 $venv"
+say "python $py ($pyexe)"
 
 if command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi -L >/dev/null 2>&1; then
   say "GPU: $(nvidia-smi -L | head -n1)"
@@ -68,7 +73,7 @@ print(f"  voice-service install · torch {torch.__version__}, "
       f"CUDA {'available: ' + torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'NOT available'}")
 PY
 
-say "downloading the Hearing model (Parakeet TDT 0.6B v3, ~2.5 GB, cached)"
+say "downloading the Hearing model (Parakeet TDT 0.6B v3, ~5.5 GB, cached)"
 "$venv/bin/python" -c 'from huggingface_hub import snapshot_download; snapshot_download("nvidia/parakeet-tdt-0.6b-v3")' \
   || say "WARNING: download failed; the service will try again when it starts"
 
