@@ -53,6 +53,17 @@ Hermes can perform the clone, setup, launch, and health check with its terminal 
 
 Hearing and Speaking run in the local voice-service (`python3 -m voice_service`, see `voice_service/`). The dashboard finds it at `JARVIS_VOICE_URL` in `.env` (default `http://127.0.0.1:8731`). While it is offline the HUD shows VOICE OFFLINE and typed chat still works.
 
+The service runs in WSL2 on the GPU machine: Parakeet TDT 0.6B v3 for Hearing and Kokoro-82M for Speaking, both on CUDA.
+
+```bash
+voice_service/install.sh              # once: own venv with torch (CUDA), NeMo, Kokoro; fetches the models
+voice_service/start.sh                # serve; Ctrl+C stops it
+voice_service/start.sh roundtrip      # smoke test: says a sentence, hears it back, prints times and GPU memory
+voice_service/start.sh roundtrip "Shall I prepare the suit, sir?"
+```
+
+Jarvis's Voice is `JARVIS_VOICE` in `.env` (default `bm_george`, British male); any English Kokoro Voice works (`af_*`, `am_*`, `bf_*`, `bm_*`).
+
 ## Hermes profile and tools
 
 The dashboard uses the `default` Hermes profile unless overridden:

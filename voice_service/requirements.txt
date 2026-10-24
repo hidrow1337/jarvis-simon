@@ -3,3 +3,6 @@
 
 # Hearing model: Parakeet TDT 0.6B v3
 nemo_toolkit[asr]>=2.4
+
+# Speaking model: Kokoro-82M (with misaki's English G2P)
+kokoro>=0.9.4

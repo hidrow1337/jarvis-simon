@@ -7,11 +7,14 @@
 # JARVIS_VOICE_VENV   where the venv lives (default ~/.venvs/jarvis-voice; kept
 #                     out of the checkout, which may sit on slow /mnt/c)
 # JARVIS_TORCH_CUDA   which CUDA build of torch to install (default cu128)
+# JARVIS_VOICE        the Kokoro Voice to fetch ahead (else the repo's .env, else bm_george)
 set -euo pipefail
 
 cd "$(dirname "$0")"
 venv="${JARVIS_VOICE_VENV:-$HOME/.venvs/jarvis-voice}"
 cuda="${JARVIS_TORCH_CUDA:-cu128}"
+voice="${JARVIS_VOICE:-$(sed -n 's/^JARVIS_VOICE=//p' ../.env 2>/dev/null | tail -n1 | tr -d "\"' ")}"
+voice="${voice:-bm_george}"
 
 say() { printf '  voice-service install · %s\n' "$*"; }
 die() { printf '  voice-service install · %s\n' "$*" >&2; exit 1; }
@@ -49,7 +52,7 @@ pip=("$venv/bin/python" -m pip)
 say "installing torch ($cuda build)"
 "${pip[@]}" install --upgrade torch torchaudio --index-url "https://download.pytorch.org/whl/$cuda"
 "${pip[@]}" install --upgrade Cython packaging
-say "installing NeMo (this takes a while)"
+say "installing NeMo and Kokoro (this takes a while)"
 # hold torch at the CUDA build just installed: if NeMo wants another one, fail
 # loudly here rather than quietly swap in a different build from PyPI
 pins="$(mktemp)"; trap 'rm -f "$pins"' EXIT
@@ -59,6 +62,7 @@ pins="$(mktemp)"; trap 'rm -f "$pins"' EXIT
 "$venv/bin/python" - <<'PY'
 import torch
 import nemo.collections.asr  # noqa: F401
+import kokoro  # noqa: F401
 print(f"  voice-service install · torch {torch.__version__}, "
       f"CUDA {'available: ' + torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'NOT available'}")
 PY
@@ -67,4 +71,16 @@ say "downloading the Hearing model (Parakeet TDT 0.6B v3, ~2.5 GB, cached)"
 "$venv/bin/python" -c 'from huggingface_hub import snapshot_download; snapshot_download("nvidia/parakeet-tdt-0.6b-v3")' \
   || say "WARNING: download failed; the service will try again when it starts"
 
+say "downloading the Speaking model (Kokoro-82M, ~330 MB, cached) and Voice $voice"
+# building the pipeline also fetches misaki's English language model (spaCy)
+"$venv/bin/python" - "$voice" <<'PY' || say "WARNING: download failed; the service will try again when it starts"
+import sys
+import warnings
+warnings.simplefilter("ignore")
+from kokoro import KPipeline
+voice = sys.argv[1]
+KPipeline(lang_code=voice[0], repo_id="hexgrad/Kokoro-82M", device="cpu").load_voice(voice)
+PY
+
 say "done. Start it with: voice_service/start.sh"
+say "check both models in one go with: voice_service/start.sh roundtrip"

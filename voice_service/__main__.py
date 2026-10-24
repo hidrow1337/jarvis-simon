@@ -5,6 +5,7 @@ so the heavy model dependencies never reach the dashboard. See ADR 0001.
 
     python3 -m voice_service [options]             serve
     python3 -m voice_service hear <file> [options]  hear one audio file, print the text
+    python3 -m voice_service roundtrip [text]       say a sentence, then hear it back
 """
 import argparse
 import os
@@ -34,6 +35,14 @@ def _hearing_options(p):
     p.set_defaults(allow_cpu=os.environ.get("JARVIS_VOICE_ALLOW_CPU", "0") == "1")
 
 
+def _speaking_options(p):
+    p.add_argument("--speaking", choices=sorted(models.SPEAKING), default="kokoro",
+                   help="Speaking model (default: kokoro)")
+    voice = os.environ.get("JARVIS_VOICE") or "bm_george"
+    p.add_argument("--voice", default=voice,
+                   help=f"Kokoro Voice (default: JARVIS_VOICE, else bm_george; now {voice})")
+
+
 def _log(msg):
     print(f"  voice-service · {msg}", flush=True)
 
@@ -47,6 +56,23 @@ def _load_hearing(args):
     return hearing
 
 
+def _load_speaking(args):
+    _log(f"loading Speaking model {args.speaking} ({args.voice})")
+    t0 = time.monotonic()
+    speaking = models.SPEAKING[args.speaking](args)
+    _log(f"Speaking model {speaking.name} ready on {speaking.device} "
+         f"in {time.monotonic() - t0:.1f} s")
+    return speaking
+
+
+def _load_both(args):
+    hearing, speaking = _load_hearing(args), _load_speaking(args)
+    mem = models.gpu_memory()
+    if mem:
+        _log(f"GPU memory {mem}")
+    return hearing, speaking
+
+
 def serve(argv):
     p = argparse.ArgumentParser(prog="python3 -m voice_service",
                                 description="Local Hearing and Speaking for Jarvis. "
@@ -58,15 +84,11 @@ def serve(argv):
     p.add_argument("--port", type=int, default=url_port,
                    help=f"default: the port of JARVIS_VOICE_URL ({url_port})")
     _hearing_options(p)
-    p.add_argument("--speaking", choices=sorted(models.SPEAKING), default="kokoro",
-                   help="Speaking model (default: kokoro)")
-    p.add_argument("--voice", default="bm_george", help="Kokoro Voice (default: bm_george)")
+    _speaking_options(p)
     args = p.parse_args(argv)
 
     try:
-        hearing = _load_hearing(args)
-        _log(f"loading Speaking model {args.speaking} ({args.voice})")
-        speaking = models.SPEAKING[args.speaking](args)
+        hearing, speaking = _load_both(args)
     except Exception as e:                                # noqa: BLE001
         print(f"  voice-service · cannot start: {e}", file=sys.stderr, flush=True)
         return 1
@@ -103,10 +125,45 @@ def hear(argv):
     return 0
 
 
+ROUNDTRIP_TEXT = "Good evening, sir. All systems are online and ready."
+
+
+def roundtrip(argv):
+    """Smoke test for both models at once: a sentence goes through Speaking,
+    and the audio comes back through Hearing."""
+    p = argparse.ArgumentParser(prog="python3 -m voice_service roundtrip",
+                                description="Say a sentence with the Speaking model, "
+                                            "hear it back with the Hearing model.")
+    p.add_argument("text", nargs="?", default=ROUNDTRIP_TEXT,
+                   help=f"what to say (default: {ROUNDTRIP_TEXT!r})")
+    _hearing_options(p)
+    _speaking_options(p)
+    args = p.parse_args(argv)
+
+    try:
+        hearing, speaking = _load_both(args)
+        t0 = time.monotonic()
+        spoken = speaking.speak(args.text)
+        t1 = time.monotonic()
+        wav = server.to_wav16k(spoken, "audio/wav")
+        t2 = time.monotonic()
+        text = (hearing.hear(wav) or "").strip()
+        t3 = time.monotonic()
+    except Exception as e:                                # noqa: BLE001
+        print(f"  voice-service · roundtrip failed: {e}", file=sys.stderr, flush=True)
+        return 1
+    print(f"\n  said:  {args.text!r}")
+    print(f"  heard: {text!r}")
+    print(f"  Speaking {t1 - t0:.2f} s · ffmpeg {t2 - t1:.2f} s · Hearing {t3 - t2:.2f} s")
+    return 0
+
+
 def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
     if argv[:1] == ["hear"]:
         return hear(argv[1:])
+    if argv[:1] == ["roundtrip"]:
+        return roundtrip(argv[1:])
     return serve(argv)
 
 

@@ -4,8 +4,10 @@
 #
 #   voice_service/start.sh
 #   voice_service/start.sh hear recording.webm      Hearing smoke test
+#   voice_service/start.sh roundtrip ["text"]       Speaking -> Hearing smoke test
 #
-# Reads JARVIS_VOICE_URL (port) and JARVIS_VOICE_ALLOW_CPU from the repo's .env.
+# Reads JARVIS_VOICE_URL (port), JARVIS_VOICE and JARVIS_VOICE_ALLOW_CPU from the
+# repo's .env.
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"

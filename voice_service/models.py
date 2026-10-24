@@ -12,7 +12,9 @@ start with fakes on a machine that has none of them.
 import io
 import logging
 import os
+import re
 import tempfile
+import warnings
 import wave
 
 
@@ -50,13 +52,6 @@ class FakeSpeaking:
         return buf.getvalue()
 
 
-def _not_yet(model):
-    def load(args):
-        raise RuntimeError(f"the real {model} model is not wired up yet — "
-                           f"run with --speaking fake for now")
-    return load
-
-
 _device = None
 
 
@@ -84,6 +79,16 @@ def pick_device(allow_cpu):
                                "`nvidia-smi` works in WSL, or set JARVIS_VOICE_ALLOW_CPU=1 "
                                "to run on the CPU (slow)")
     return _device
+
+
+def gpu_memory():
+    """How much of the GPU is in use (by every process, as nvidia-smi counts),
+    or None when no real model runs on CUDA."""
+    if _device != "cuda":
+        return None
+    import torch
+    free, total = torch.cuda.mem_get_info()
+    return f"{(total - free) / 2**30:.1f} of {total / 2**30:.1f} GB in use"
 
 
 PARAKEET = "nvidia/parakeet-tdt-0.6b-v3"
@@ -121,18 +126,65 @@ class Parakeet:
         return getattr(first, "text", first) or ""
 
 
-def _silence(rate, seconds):
+KOKORO = "hexgrad/Kokoro-82M"
+
+
+class Kokoro:
+    """Kokoro-82M with one English Voice: loaded once, then kept warm."""
+
+    name = KOKORO.split("/")[-1]
+    rate = 24000
+
+    def __init__(self, device, voice):
+        # the conversation is English (ADR 0001): American (a) or British (b),
+        # female or male; the first letter is also Kokoro's language code
+        if not re.fullmatch(r"[ab][fm]_[a-z]+", voice):
+            raise RuntimeError(f"{voice!r} is not an English Kokoro Voice — pick one "
+                               f"named af_*, am_*, bf_* or bm_*, such as bm_george")
+        try:
+            from kokoro import KPipeline
+        except ImportError:
+            raise RuntimeError("Kokoro is not installed in this environment — "
+                               "run voice_service/install.sh") from None
+        with warnings.catch_warnings():       # torch's deprecation notes on every load
+            warnings.simplefilter("ignore")
+            self._pipeline = KPipeline(lang_code=voice[0], repo_id=KOKORO, device=device)
+        try:
+            self._pipeline.load_voice(voice)
+        except Exception as e:                            # noqa: BLE001
+            raise RuntimeError(f"cannot load Kokoro Voice {voice}: {e}") from None
+        self.device = device
+        self.voice = voice
+        self.speak("Ready.")   # first call pays CUDA warm-up, not the user
+
+    def speak(self, text):
+        pcm = b"".join(r.audio.cpu().clamp(-1, 1).mul(32767).short().numpy().tobytes()
+                       for r in self._pipeline(text, voice=self.voice)
+                       if r.audio is not None)
+        return _wav(self.rate, pcm)
+
+
+def _wav(rate, pcm):
+    """16-bit mono PCM -> WAV bytes."""
     buf = io.BytesIO()
     with wave.open(buf, "wb") as w:
         w.setnchannels(1)
         w.setsampwidth(2)
         w.setframerate(rate)
-        w.writeframes(b"\0\0" * int(rate * seconds))
+        w.writeframes(pcm)
     return buf.getvalue()
+
+
+def _silence(rate, seconds):
+    return _wav(rate, b"\0\0" * int(rate * seconds))
 
 
 def load_parakeet(args):
     return Parakeet(pick_device(args.allow_cpu))
+
+
+def load_kokoro(args):
+    return Kokoro(pick_device(args.allow_cpu), args.voice)
 
 
 # name -> loader(args). Real loaders do their heavy imports inside.
@@ -141,6 +193,6 @@ HEARING = {
     "fake": lambda args: FakeHearing(args.fake_heard),
 }
 SPEAKING = {
-    "kokoro": _not_yet("Kokoro Speaking"),
+    "kokoro": load_kokoro,
     "fake": lambda args: FakeSpeaking(),
 }

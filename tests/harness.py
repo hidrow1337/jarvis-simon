@@ -191,20 +191,21 @@ FAKE_HEARD = "the fake hearing model heard you"
 class VoiceService(_ServerProcess):
     """The real voice-service, with fake Hearing and Speaking models injected.
     The fake Hearing model answers FAKE_HEARD for any 16 kHz mono WAV.
-    `hearing="parakeet"` runs the real Hearing model instead (with stub_env(),
-    against the stub NeMo)."""
+    `hearing="parakeet"` / `speaking="kokoro"` run the real models instead (with
+    stub_env(), against the stub NeMo and Kokoro)."""
 
     name = "voice-service"
     ready_path = "/health"
 
-    def __init__(self, env=None, hearing="fake"):
+    def __init__(self, env=None, hearing="fake", speaking="fake"):
         super().__init__(env)
         self.hearing = hearing
+        self.speaking = speaking
         self.url = f"http://127.0.0.1:{self.port}"
 
     def argv(self):
-        return [sys.executable, "-m", "voice_service",
-                "--hearing", self.hearing, "--speaking", "fake", "--fake-heard", FAKE_HEARD]
+        return [sys.executable, "-m", "voice_service", "--hearing", self.hearing,
+                "--speaking", self.speaking, "--fake-heard", FAKE_HEARD]
 
     def child_env(self, tmp):
         # the same setting the dashboard reads; the service listens on its port
@@ -224,10 +225,11 @@ STUBS = ROOT / "tests" / "stubs"
 
 
 def stub_env(**env):
-    """Environment that puts the stub torch and NeMo packages (tests/stubs) on
+    """Environment that puts the stub torch, NeMo and Kokoro packages (tests/stubs) on
     the voice-service's import path, plus `env`. CPU is not allowed unless
-    `env` says so, whatever the repo's .env holds."""
-    return {"PYTHONPATH": str(STUBS), "JARVIS_VOICE_ALLOW_CPU": "0", **env}
+    `env` says so, and the Voice is the default unless `env` names one, whatever
+    the repo's .env holds."""
+    return {"PYTHONPATH": str(STUBS), "JARVIS_VOICE_ALLOW_CPU": "0", "JARVIS_VOICE": "", **env}
 
 
 def audio_clip(fmt, seconds=1.0):
