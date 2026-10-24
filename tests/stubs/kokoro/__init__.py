@@ -20,12 +20,10 @@ class KPipeline:
         if repo_id != "hexgrad/Kokoro-82M":
             raise FileNotFoundError(f"no such model: {repo_id}")
         self.lang_code = lang_code
-        self.voices = {}
 
     def load_voice(self, voice):
         if voice not in VOICES:
             raise FileNotFoundError(f"404 Client Error: voices/{voice}.pt not found")
-        self.voices[voice] = voice
         return voice
 
     def __call__(self, text, voice=None, speed=1, split_pattern=r"\n+"):

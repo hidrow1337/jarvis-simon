@@ -43,13 +43,7 @@ class FakeSpeaking:
     device = "cpu"
 
     def speak(self, text):
-        buf = io.BytesIO()
-        with wave.open(buf, "wb") as w:
-            w.setnchannels(1)
-            w.setsampwidth(2)
-            w.setframerate(24000)
-            w.writeframes(b"\0\0" * 6000)
-        return buf.getvalue()
+        return _silence(24000, 0.25)
 
 
 _device = None
@@ -127,6 +121,7 @@ class Parakeet:
 
 
 KOKORO = "hexgrad/Kokoro-82M"
+DEFAULT_VOICE = "bm_george"    # British male
 
 
 class Kokoro:
@@ -140,7 +135,7 @@ class Kokoro:
         # female or male; the first letter is also Kokoro's language code
         if not re.fullmatch(r"[ab][fm]_[a-z]+", voice):
             raise RuntimeError(f"{voice!r} is not an English Kokoro Voice — pick one "
-                               f"named af_*, am_*, bf_* or bm_*, such as bm_george")
+                               f"named af_*, am_*, bf_* or bm_*, such as {DEFAULT_VOICE}")
         try:
             from kokoro import KPipeline
         except ImportError:

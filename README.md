@@ -58,7 +58,7 @@ The service runs in WSL2 on the GPU machine: Parakeet TDT 0.6B v3 for Hearing an
 ```bash
 voice_service/install.sh              # once: own venv with torch (CUDA), NeMo, Kokoro; fetches the models
 voice_service/start.sh                # serve; Ctrl+C stops it
-voice_service/start.sh roundtrip      # smoke test: says a sentence, hears it back, prints times and GPU memory
+voice_service/start.sh roundtrip      # smoke test: says a sentence, hears it back; prints both, times, GPU memory, match or MISMATCH
 voice_service/start.sh roundtrip "Shall I prepare the suit, sir?"
 ```
 

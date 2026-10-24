@@ -10,6 +10,7 @@ so the heavy model dependencies never reach the dashboard. See ADR 0001.
 import argparse
 import os
 import pathlib
+import re
 import sys
 import time
 from urllib.parse import urlparse
@@ -38,9 +39,10 @@ def _hearing_options(p):
 def _speaking_options(p):
     p.add_argument("--speaking", choices=sorted(models.SPEAKING), default="kokoro",
                    help="Speaking model (default: kokoro)")
-    voice = os.environ.get("JARVIS_VOICE") or "bm_george"
+    voice = os.environ.get("JARVIS_VOICE") or models.DEFAULT_VOICE
     p.add_argument("--voice", default=voice,
-                   help=f"Kokoro Voice (default: JARVIS_VOICE, else bm_george; now {voice})")
+                   help=f"Kokoro Voice (default: JARVIS_VOICE, else "
+                        f"{models.DEFAULT_VOICE}; now {voice})")
 
 
 def _log(msg):
@@ -65,7 +67,7 @@ def _load_speaking(args):
     return speaking
 
 
-def _load_both(args):
+def _load_models(args):
     hearing, speaking = _load_hearing(args), _load_speaking(args)
     mem = models.gpu_memory()
     if mem:
@@ -88,7 +90,7 @@ def serve(argv):
     args = p.parse_args(argv)
 
     try:
-        hearing, speaking = _load_both(args)
+        hearing, speaking = _load_models(args)
     except Exception as e:                                # noqa: BLE001
         print(f"  voice-service · cannot start: {e}", file=sys.stderr, flush=True)
         return 1
@@ -141,7 +143,7 @@ def roundtrip(argv):
     args = p.parse_args(argv)
 
     try:
-        hearing, speaking = _load_both(args)
+        hearing, speaking = _load_models(args)
         t0 = time.monotonic()
         spoken = speaking.speak(args.text)
         t1 = time.monotonic()
@@ -155,7 +157,16 @@ def roundtrip(argv):
     print(f"\n  said:  {args.text!r}")
     print(f"  heard: {text!r}")
     print(f"  Speaking {t1 - t0:.2f} s · ffmpeg {t2 - t1:.2f} s · Hearing {t3 - t2:.2f} s")
+    if _words(text) != _words(args.text):
+        print("  MISMATCH: the heard words differ from the said ones")
+        return 1
+    print("  match: heard word for word what was said")
     return 0
+
+
+def _words(text):
+    """Text as its words, ignoring case and punctuation."""
+    return re.findall(r"[a-z0-9']+", text.lower())
 
 
 def main(argv=None):
