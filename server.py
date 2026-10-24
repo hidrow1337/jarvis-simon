@@ -267,9 +267,17 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
-    kind = runtime.runtime_kind()
-    brain = ("Hermes Agent (profile tools, skills, memory, MCP, browser integrations live)"
-             if kind == "hermes" else "MOCK — Hermes CLI not reachable")
+    kind, detail = runtime.check_runtime()
+    configured = os.environ.get("HERMES_CMD", "").strip()
+    if kind == "hermes":
+        brain = "Hermes Agent (profile tools, skills, memory, MCP, browser integrations live)"
+    elif detail and configured:
+        # say which HERMES_CMD failed and why, so a mangled path is visible
+        reason = ([ln for ln in detail.splitlines() if ln.strip()] or [""])[-1]
+        brain = (f"MOCK — could not start Hermes with HERMES_CMD={configured}\n"
+                 f"               {reason[:200]}")
+    else:
+        brain = "MOCK — Hermes CLI not reachable"
     v = voice_service_status()
     voice_line = (f"local · {v['hearing_model']} / {v['speaking_model']} · {v['voice']} ({v['device']})"
              if v["online"] else "VOICE OFFLINE — start the voice-service")

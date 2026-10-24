@@ -45,7 +45,7 @@ Dashboardet starter Hermes' CLI direkte fra Windows, så Hermes skal være insta
 hermes chat -q "Say online"
 ```
 
-Ligger `hermes` ikke på PATH, så find den fulde sti med `where.exe hermes`. Den skal i `HERMES_CMD` nedenfor, **med `/` i stedet for `\`** (fx `HERMES_CMD=C:/Users/<dig>/AppData/Local/hermes/hermes.exe`). Dashboardet deler værdien op som en shell-kommando, så backslashes forsvinder, og en sti med mellemrum bliver delt op. Står Hermes i en mappe med mellemrum, så flyt den, eller læg mappen på PATH i stedet.
+Ligger `hermes` ikke på PATH, så find den fulde sti med `where.exe hermes`, og sæt den i `HERMES_CMD` nedenfor, som den står, fx `HERMES_CMD=C:\Users\<dig>\AppData\Local\hermes\hermes.exe`. Mellemrum i stien er fine (`HERMES_CMD=C:\Program Files\Hermes\hermes.exe`).
 
 ### Dashboardet
 
@@ -79,7 +79,7 @@ Det skriver et banner og åbner <http://localhost:8730> i browseren:
   open         http://localhost:8730
 ```
 
-`VOICE OFFLINE` er forventet indtil videre. Står der `brain  MOCK — Hermes CLI not reachable`, kan dashboardet ikke starte Hermes; se [Fejlsøgning](#hermes-svarer-ikke). Stop dashboardet med `Ctrl+C`.
+`VOICE OFFLINE` er forventet indtil videre. Står der `brain  MOCK — …`, kan dashboardet ikke starte Hermes; se [Fejlsøgning](#hermes-svarer-ikke). Stop dashboardet med `Ctrl+C`.
 
 Upstreams `install.sh` og `start.sh` i roden er bash-scripts til macOS og Linux. På Windows starter du dashboardet med `python server.py` som ovenfor.
 
@@ -320,7 +320,7 @@ Til installation og start af voice-servicen kan du desuden sætte, i WSL-termina
 | Indstilling | Default | Betydning |
 |---|---|---|
 | `HERMES_PROFILE` | `default` | Hermes-profilen, hvis tools, skills, hukommelse, browser og MCP-servere bruges. (`JARVIS_PROFILE` virker også.) |
-| `HERMES_CMD` | `hermes` på PATH | Fuld kommando til Hermes, hvis den ikke ligger på PATH. Brug `/` i Windows-stier og ingen mellemrum (se [Hermes](#hermes)). |
+| `HERMES_CMD` | `hermes` på PATH | Fuld sti til Hermes, hvis den ikke ligger på PATH (se [Hermes](#hermes)). Kan også være en kommando med argumenter, fx `python3 -m hermes_cli.main`. |
 | `JARVIS_WORKDIR` | `~` (i `.env.example`) | Hermes' arbejdsmappe. `~` er din brugermappe. Uden indstillingen er det mappen, dashboardet startes fra. |
 | `JARVIS_PORT` | `8730` | Dashboardets port. |
 | `JARVIS_OPEN` | `1` | `0` åbner ikke browseren ved start. |
@@ -394,7 +394,7 @@ Voice-servicen stopper med `cannot start: CUDA is not available: torch sees no G
 
 ### Hermes svarer ikke
 
-Banneret siger `MOCK — Hermes CLI not reachable`, eller HUD'en siger `Hermes offline`:
+Banneret siger `MOCK — Hermes CLI not reachable` eller `MOCK — could not start Hermes with HERMES_CMD=…`, eller HUD'en siger `Hermes offline`:
 
 ```powershell
 where.exe hermes
@@ -402,7 +402,7 @@ hermes --version
 hermes doctor
 ```
 
-Virker `hermes` i PowerShell, men ikke i dashboardet, så sæt den fulde sti i `HERMES_CMD` i `.env`, og genstart dashboardet.
+Virker `hermes` i PowerShell, men ikke i dashboardet, så sæt den fulde sti i `HERMES_CMD` i `.env`, og genstart dashboardet. Er `HERMES_CMD` sat, viser banneret værdien og linjen under den fejlen fra Windows; passer stien ikke med `where.exe hermes`, så ret den.
 
 ### Mikrofonen starter ikke
 

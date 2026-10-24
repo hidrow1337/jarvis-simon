@@ -9,6 +9,8 @@ normal Hermes agent.
 
 Set HERMES_CMD when your shell exposes Hermes under a custom command/path, e.g.
   HERMES_CMD="/path/to/hermes"
+or, on Windows, the path as `where.exe hermes` prints it (spaces are fine)
+  HERMES_CMD=C:\Program Files\Hermes\hermes.exe
 or
   HERMES_CMD="python3 -m hermes_cli.main"
 """
@@ -70,10 +72,23 @@ def _mono_ms():
     return int(time.monotonic() * 1000)
 
 
+def _split_hermes_cmd(configured):
+    # A bare path to Hermes is one argument, even with spaces or backslashes:
+    # .env loading has already dropped any quotes around it.
+    if os.path.isfile(configured):
+        return [configured]
+    lex = shlex.shlex(configured, posix=True)
+    lex.whitespace_split = True
+    lex.commenters = ""
+    if os.name == "nt":
+        lex.escape = ""   # backslashes are path separators on Windows, not escapes
+    return list(lex)
+
+
 def _hermes_base():
     configured = os.environ.get("HERMES_CMD", "").strip()
     if configured:
-        return shlex.split(configured)
+        return _split_hermes_cmd(configured)
     exe = shutil.which("hermes")
     if exe:
         return [exe]
@@ -92,13 +107,19 @@ def _can_launch_hermes():
         return False, str(e)
 
 
-def runtime_kind():
+def check_runtime():
+    """(kind, detail): which runtime answers, and why Hermes didn't start when
+    it was tried and failed (else "")."""
     if RUNTIME == "mock":
-        return "mock"
+        return "mock", ""
     if RUNTIME == "hermes":
-        return "hermes"
-    ok, _ = _can_launch_hermes()
-    return "hermes" if ok else "mock"
+        return "hermes", ""
+    ok, detail = _can_launch_hermes()
+    return ("hermes", "") if ok else ("mock", detail)
+
+
+def runtime_kind():
+    return check_runtime()[0]
 
 
 def build_command(message, session_id=None, system=None):
