@@ -8,7 +8,8 @@ way, with fake Hearing/Speaking models injected.
 
 Stdlib only. The dashboard runs with the mock runtime, a Hermes command that
 doesn't exist, its browser auto-open off and its state file in a temp dir, so
-tests never launch Hermes or write the repo's state.json. Unless a test points
+tests never launch Hermes or write the repo's state.json (tests that set
+JARVIS_RUNTIME=auto launch a fake Hermes of their own). Unless a test points
 JARVIS_VOICE_URL at a running voice-service, it points at a closed port, so the
 voice-service is offline. Inherited JARVIS_* and HERMES_* variables are
 dropped; note that server.py still reads the repo's .env for any

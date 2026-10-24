@@ -6,16 +6,17 @@ import unittest
 
 from tests.harness import Dashboard
 
-# Answers `--version` and `tools list` the way the dashboard asks Hermes at startup.
+# Prints a version line and exits 0, whatever it's asked: enough for the
+# dashboard's `--version` check.
 _FAKE_HERMES = f"""#!{sys.executable}
 print("hermes fake 0.0")
 """
 
 
-def fake_hermes(path):
+def fake_hermes(path, body=_FAKE_HERMES):
     """Writes an executable stand-in for the Hermes CLI at `path`."""
     with open(path, "w", encoding="utf-8") as f:
-        f.write(_FAKE_HERMES)
+        f.write(body)
     os.chmod(path, os.stat(path).st_mode | stat.S_IXUSR)
     return path
 
@@ -51,6 +52,13 @@ class HermesCmdTest(unittest.TestCase):
 
         self.assertEqual(res.json()["runtime"], "hermes")
 
+    def test_quoted_path_with_spaces_plus_arguments_starts_hermes(self):
+        script = fake_hermes(os.path.join(self.tmp, r"Program Files\hermes_cli.py"))
+
+        res = self.dashboard(f'{sys.executable} "{script}"').get("/api/status")
+
+        self.assertEqual(res.json()["runtime"], "hermes")
+
     def test_banner_names_a_hermes_cmd_that_does_not_start(self):
         missing = os.path.join(self.tmp, r"Program Files\Hermes\hermes.exe")
 
@@ -59,6 +67,15 @@ class HermesCmdTest(unittest.TestCase):
         self.assertIn(f"MOCK — could not start Hermes with HERMES_CMD={missing}", banner)
         self.assertIn("No such file or directory", banner)
         self.assertNotIn("Hermes CLI not reachable", banner)
+
+    def test_banner_names_a_hermes_cmd_that_fails_silently(self):
+        broken = fake_hermes(os.path.join(self.tmp, "hermes"),
+                             f"#!{sys.executable}\nraise SystemExit(3)\n")
+
+        banner = self.dashboard(broken).output()
+
+        self.assertIn(f"MOCK — could not start Hermes with HERMES_CMD={broken}", banner)
+        self.assertIn("exited with code 3", banner)
 
 
 if __name__ == "__main__":

@@ -40,6 +40,7 @@ IDLE_TIMEOUT = int(os.environ.get("JARVIS_TIMEOUT", "120"))
 # Raw transcripts can contain private prompts. Logging is off by default.
 RAW_LOG = os.environ.get("JARVIS_RAW_LOG", "").strip()
 TOOLSETS = os.environ.get("HERMES_TOOLSETS", "").strip()
+HERMES_CMD = os.environ.get("HERMES_CMD", "").strip()
 
 # One Hermes subprocess at a time. Hermes session state and profile resources are
 # shared, so foreground runs and /background missions must not overlap. The active
@@ -74,8 +75,9 @@ def _mono_ms():
 
 def _split_hermes_cmd(configured):
     # A bare path to Hermes is one argument, even with spaces or backslashes:
-    # .env loading has already dropped any quotes around it.
-    if os.path.isfile(configured):
+    # .env loading has already dropped any quotes around it. Hermes runs in
+    # WORKDIR, so that's where a relative path points.
+    if os.path.isfile(os.path.join(WORKDIR, configured)):
         return [configured]
     lex = shlex.shlex(configured, posix=True)
     lex.whitespace_split = True
@@ -86,9 +88,8 @@ def _split_hermes_cmd(configured):
 
 
 def _hermes_base():
-    configured = os.environ.get("HERMES_CMD", "").strip()
-    if configured:
-        return _split_hermes_cmd(configured)
+    if HERMES_CMD:
+        return _split_hermes_cmd(HERMES_CMD)
     exe = shutil.which("hermes")
     if exe:
         return [exe]
@@ -102,7 +103,8 @@ def _can_launch_hermes():
         proc = subprocess.run(base + ["--version"], cwd=WORKDIR, text=True,
                               stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                               timeout=12)
-        return proc.returncode == 0, (proc.stdout or proc.stderr).strip()
+        out = (proc.stdout or proc.stderr).strip()
+        return proc.returncode == 0, out or f"exited with code {proc.returncode}"
     except Exception as e:  # noqa: BLE001
         return False, str(e)
 

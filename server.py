@@ -30,7 +30,12 @@ if _env.exists():
         line = line.strip()
         if line and not line.startswith("#") and "=" in line:
             k, _, v = line.partition("=")
-            os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+            v = v.strip()
+            # only a pair of quotes around the whole value is quoting; quotes
+            # inside it, like HERMES_CMD="C:\Program Files\…\python.exe" -m x, stay
+            if len(v) >= 2 and v[0] == v[-1] and v[0] in "\"'" and v[0] not in v[1:-1]:
+                v = v[1:-1]
+            os.environ.setdefault(k.strip(), v)
 
 import commands         # noqa: E402
 import runtime          # noqa: E402
@@ -268,13 +273,12 @@ class Handler(BaseHTTPRequestHandler):
 
 def main():
     kind, detail = runtime.check_runtime()
-    configured = os.environ.get("HERMES_CMD", "").strip()
     if kind == "hermes":
         brain = "Hermes Agent (profile tools, skills, memory, MCP, browser integrations live)"
-    elif detail and configured:
+    elif detail and runtime.HERMES_CMD:
         # say which HERMES_CMD failed and why, so a mangled path is visible
-        reason = ([ln for ln in detail.splitlines() if ln.strip()] or [""])[-1]
-        brain = (f"MOCK — could not start Hermes with HERMES_CMD={configured}\n"
+        reason = [ln for ln in detail.splitlines() if ln.strip()][-1]
+        brain = (f"MOCK — could not start Hermes with HERMES_CMD={runtime.HERMES_CMD}\n"
                  f"               {reason[:200]}")
     else:
         brain = "MOCK — Hermes CLI not reachable"

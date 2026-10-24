@@ -45,7 +45,7 @@ Dashboardet starter Hermes' CLI direkte fra Windows, så Hermes skal være insta
 hermes chat -q "Say online"
 ```
 
-Ligger `hermes` ikke på PATH, så find den fulde sti med `where.exe hermes`, og sæt den i `HERMES_CMD` nedenfor, som den står, fx `HERMES_CMD=C:\Users\<dig>\AppData\Local\hermes\hermes.exe`. Mellemrum i stien er fine (`HERMES_CMD=C:\Program Files\Hermes\hermes.exe`).
+Ligger `hermes` ikke på PATH, så find den fulde sti med `where.exe hermes`, og sæt den i `HERMES_CMD` nedenfor, som den står, fx `HERMES_CMD=C:\Users\<dig>\AppData\Local\hermes\hermes.exe`. Mellemrum i stien er fine (`HERMES_CMD=C:\Program Files\Hermes\hermes.exe`). Kommer der argumenter efter en sti med mellemrum, så sæt anførselstegn om stien: `HERMES_CMD="C:\Program Files\Python312\python.exe" -m hermes_cli.main`.
 
 ### Dashboardet
 
