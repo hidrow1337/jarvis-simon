@@ -46,7 +46,7 @@ class SpeakingWithServiceStoppedTest(VoiceTestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        cls.voice.stop()
+        cls.service.stop()
 
     def test_speak_fails_with_503_and_says_the_service_is_offline(self):
         res = self.dashboard.post("/api/speak", {"text": "Good evening, sir."})

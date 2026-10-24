@@ -271,7 +271,7 @@ def main():
     brain = ("Hermes Agent (profile tools, skills, memory, MCP, browser integrations live)"
              if kind == "hermes" else "MOCK — Hermes CLI not reachable")
     v = voice_service_status()
-    local = (f"local · {v['hearing_model']} / {v['speaking_model']} · {v['voice']} ({v['device']})"
+    voice_line = (f"local · {v['hearing_model']} / {v['speaking_model']} · {v['voice']} ({v['device']})"
              if v["online"] else "VOICE OFFLINE — start the voice-service")
     perm = runtime.PERMISSION
     perm_note = ("  can run tools without asking — set JARVIS_PERMISSION=default to require approval"
@@ -284,7 +284,7 @@ def main():
   profile      {runtime.PROFILE}
   workdir      {runtime.WORKDIR}
   permission   {perm}{perm_note}
-  voice        {local} · {voice.service_url()}
+  voice        {voice_line} · {voice.service_url()}
   open         http://localhost:{PORT}
 """, flush=True)
 

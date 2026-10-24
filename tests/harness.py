@@ -225,12 +225,12 @@ class DashboardTestCase(unittest.TestCase):
 
 
 class VoiceTestCase(unittest.TestCase):
-    """A voice-service with fake models (`self.voice`) and a dashboard pointed
+    """A voice-service with fake models (`self.service`) and a dashboard pointed
     at it (`self.dashboard`), one of each per test class."""
 
     @classmethod
     def setUpClass(cls):
-        cls.voice = VoiceService().start()
-        cls.addClassCleanup(cls.voice.stop)
-        cls.dashboard = Dashboard({"JARVIS_VOICE_URL": cls.voice.url}).start()
+        cls.service = VoiceService().start()
+        cls.addClassCleanup(cls.service.stop)
+        cls.dashboard = Dashboard({"JARVIS_VOICE_URL": cls.service.url}).start()
         cls.addClassCleanup(cls.dashboard.stop)

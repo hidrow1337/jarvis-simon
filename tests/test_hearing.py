@@ -65,7 +65,7 @@ class HearingWithServiceStoppedTest(VoiceTestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        cls.voice.stop()
+        cls.service.stop()
 
     def test_status_reports_voice_service_offline(self):
         service = self.dashboard.get("/api/status").json()["voice_service"]

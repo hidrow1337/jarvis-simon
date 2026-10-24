@@ -16,6 +16,8 @@ import threading
 import time
 import uuid
 
+import voice
+
 ROOT = pathlib.Path(__file__).resolve().parent
 STATE_FILE = pathlib.Path(os.environ.get("JARVIS_STATE", ROOT / "state.json"))
 _LOCK = threading.Lock()
@@ -189,7 +191,7 @@ def handle(message, runner=None):
     if cmd == "status":
         profile = os.environ.get("HERMES_PROFILE", os.environ.get("JARVIS_PROFILE", "default"))
         runtime = os.environ.get("HERMES_CMD", "hermes")
-        return dict(message=None, reply=f"Hermes dashboard online. profile={profile}; runtime={runtime}; workdir={os.getcwd()}; voice=local voice-service at {os.environ.get('JARVIS_VOICE_URL', 'http://127.0.0.1:8731')}.", note="status read")
+        return dict(message=None, reply=f"Hermes dashboard online. profile={profile}; runtime={runtime}; workdir={os.getcwd()}; voice=local voice-service at {voice.service_url()}.", note="status read")
 
     if cmd in ("tools", "toolsets"):
         if cmd == "tools":

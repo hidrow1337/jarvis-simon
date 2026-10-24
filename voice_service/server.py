@@ -63,14 +63,16 @@ def make_server(port, hearing, speaking, voice):
         def log_message(self, fmt, *args):
             pass
 
-        def _json(self, body, code=200):
-            data = json.dumps(body).encode()
+        def _bytes(self, data, ctype, code=200):
             self.send_response(code)
-            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Type", ctype)
             self.send_header("Content-Length", str(len(data)))
             self.send_header("Cache-Control", "no-store")
             self.end_headers()
             self.wfile.write(data)
+
+        def _json(self, body, code=200):
+            self._bytes(json.dumps(body).encode(), "application/json", code)
 
         def _host_ok(self):
             # same DNS-rebinding guard as the dashboard
@@ -87,14 +89,6 @@ def make_server(port, hearing, speaking, voice):
                     voice=voice,
                     device=hearing.device))
             return self._json({"error": "no such endpoint"}, 404)
-
-        def _wav(self, data):
-            self.send_response(200)
-            self.send_header("Content-Type", "audio/wav")
-            self.send_header("Content-Length", str(len(data)))
-            self.send_header("Cache-Control", "no-store")
-            self.end_headers()
-            self.wfile.write(data)
 
         def _body(self, limit):
             """The request body, or None after answering 413."""
@@ -155,6 +149,6 @@ def make_server(port, hearing, speaking, voice):
                     wav = speaking.speak(text)
             except Exception as e:                        # noqa: BLE001
                 return self._json({"error": f"Speaking model failed: {e}"[:300]}, 500)
-            return self._wav(wav)
+            return self._bytes(wav, "audio/wav")
 
     return ThreadingHTTPServer((HOST, port), Handler)
