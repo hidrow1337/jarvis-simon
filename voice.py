@@ -1,11 +1,13 @@
 """
-Text to speech.
+Voice for the dashboard.
 
-ElevenLabs when a key is present, browser speechSynthesis otherwise.
+Hearing goes to the local voice-service at JARVIS_VOICE_URL (see voice_service/
+and ADR 0001): the browser's recording is forwarded as-is and text comes back.
 
-The key stays here, server-side. The browser asks /api/speak for audio and gets
-mp3 bytes back — it never sees the key, so nothing leaks into devtools, the
-page source, or a screen recording.
+Speaking is still ElevenLabs when a key is present, browser speechSynthesis
+otherwise. The key stays here, server-side. The browser asks /api/speak for
+audio and gets mp3 bytes back — it never sees the key, so nothing leaks into
+devtools, the page source, or a screen recording.
 """
 import json
 import os
@@ -56,43 +58,46 @@ def speak(text):
         return r.read()
 
 
-def transcribe(audio, mime="audio/webm"):
-    """Speech to text via ElevenLabs Scribe. Returns the transcript, or raises.
+def service_url():
+    return os.environ.get("JARVIS_VOICE_URL", "http://127.0.0.1:8731").rstrip("/")
 
-    Used instead of the browser's Web Speech API because that one only exists in
-    Chrome and is a silently-failing stub in Brave — and because it ships your
-    audio to Google. This keeps listening on the same provider as speaking.
-    """
-    if not available():
-        raise RuntimeError("no ELEVENLABS_API_KEY")
+
+def _error_of(e):
+    """A readable reason from a failed voice-service call."""
+    if isinstance(e, urllib.error.HTTPError):
+        try:
+            return json.loads(e.read()).get("error") or f"HTTP {e.code}"
+        except Exception:                              # noqa: BLE001
+            return f"HTTP {e.code}"
+    if isinstance(e, urllib.error.URLError):
+        return f"voice-service offline ({e.reason})"
+    return str(e)
+
+
+def health():
+    """The voice-service's /health, or None when it is offline or not ready.
+    Short timeout: this runs on every status poll."""
+    try:
+        with urllib.request.urlopen(service_url() + "/health", timeout=1.5) as r:
+            h = json.loads(r.read())
+    except Exception:                                  # noqa: BLE001
+        return None
+    return h if isinstance(h, dict) and h.get("ready") else None
+
+
+def transcribe(audio, mime="audio/webm"):
+    """Hearing via the voice-service. Returns the text, or raises with a
+    readable reason (service offline, bad audio, Hearing model failed)."""
     if not audio:
         raise ValueError("empty audio")
-
-    ext = {"audio/webm": "webm", "audio/ogg": "ogg", "audio/mp4": "mp4",
-           "audio/mpeg": "mp3", "audio/wav": "wav"}.get(mime.split(";")[0], "webm")
-    boundary = "----jarvis" + os.urandom(8).hex()
-    b = boundary.encode()
-
-    body = b"".join([
-        b"--", b, b"\r\n",
-        b'Content-Disposition: form-data; name="model_id"\r\n\r\nscribe_v1\r\n',
-        b"--", b, b"\r\n",
-        f'Content-Disposition: form-data; name="file"; filename="turn.{ext}"\r\n'.encode(),
-        f"Content-Type: {mime}\r\n\r\n".encode(),
-        audio, b"\r\n",
-        b"--", b, b"--\r\n",
-    ])
-
     req = urllib.request.Request(
-        "https://api.elevenlabs.io/v1/speech-to-text",
-        data=body, method="POST",
-        headers={
-            "content-type": f"multipart/form-data; boundary={boundary}",
-            "xi-api-key": os.environ["ELEVENLABS_API_KEY"],
-        },
-    )
-    with urllib.request.urlopen(req, timeout=45) as r:
-        return (json.loads(r.read()).get("text") or "").strip()
+        service_url() + "/hear", data=audio, method="POST",
+        headers={"content-type": mime})
+    try:
+        with urllib.request.urlopen(req, timeout=60) as r:
+            return (json.loads(r.read()).get("text") or "").strip()
+    except Exception as e:                             # noqa: BLE001
+        raise RuntimeError(_error_of(e)) from None
 
 
 def voices():

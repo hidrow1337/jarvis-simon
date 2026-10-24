@@ -5,8 +5,9 @@ JARVIS Live — a HUD that drives Hermes Agent.
 
 The brain is your own Hermes Agent CLI/profile. Hermes keeps access to the same
 configured tools, browser/Chrome automation, MCP servers, skills, memory, and
-third-party integrations that your normal Hermes sessions have. Voice can use the
-browser Web Speech API, with optional server-side ElevenLabs STT/TTS if present.
+third-party integrations that your normal Hermes sessions have. Hearing goes to
+the local voice-service (JARVIS_VOICE_URL); Speaking uses ElevenLabs if a key is
+present, browser speech synthesis otherwise.
 """
 import json
 import mimetypes
@@ -54,6 +55,17 @@ def persona():
         base = ""
     extra = commands.context_block()      # profile / goal / personality / queue
     return "\n\n".join(x for x in (base, extra) if x)
+
+
+def voice_status():
+    """Whether the voice-service answers ready, plus its health details."""
+    h = voice.health()
+    if h is None:
+        return {"online": False}
+    return dict(online=True, **{k: h.get(k) for k in
+                                ("hearing_model", "speaking_model", "voice", "device")})
+
+
 # One continuing Hermes conversation until the user hits /new.
 SESSION = {"id": None}
 
@@ -117,13 +129,14 @@ class Handler(BaseHTTPRequestHandler):
                 workdir=runtime.WORKDIR,
                 model=runtime.MODEL or "Hermes default",
                 tools=runtime.hermes_tools_snapshot(),
-                browser_stt=True,
+                voice=voice_status(),
                 browser_tts=True,
-                voice_mode=os.environ.get("JARVIS_VOICE_MODE", "elevenlabs" if voice.available() else "browser"),
                 voice_id=voice.voice_id() if voice.available() else "browser",
-                stt="elevenlabs" if voice.available() else "browser",
                 tts="elevenlabs" if voice.available() else "browser",
                 session=SESSION["id"]))
+        if p == "/api/voice":
+            # cheap re-check for the HUD's poll; /api/status also asks Hermes
+            return self._json(voice_status())
         if p == "/api/jobs":
             if not self._token_ok():
                 return self._json({"error": "unauthorized"}, 401)
@@ -260,8 +273,10 @@ def main():
     kind = runtime.runtime_kind()
     brain = ("Hermes Agent (profile tools, skills, memory, MCP, browser integrations live)"
              if kind == "hermes" else "MOCK — Hermes CLI not reachable")
-    vo = (f"ElevenLabs · {voice.voice_id()[:8]}…" if voice.available()
-          else "none (add ELEVENLABS_API_KEY for voice)")
+    hearing = ("local voice-service" if voice.health()
+               else "VOICE OFFLINE — start the voice-service")
+    speaking = (f"ElevenLabs · {voice.voice_id()[:8]}…" if voice.available()
+                else "browser speech")
     perm = runtime.PERMISSION
     perm_note = ("  can run tools without asking — set JARVIS_PERMISSION=default to require approval"
                  if perm == "bypass" else "")
@@ -273,7 +288,8 @@ def main():
   profile      {runtime.PROFILE}
   workdir      {runtime.WORKDIR}
   permission   {perm}{perm_note}
-  voice        {vo} + browser Web Speech fallback
+  hearing      {hearing} · {voice.service_url()}
+  speaking     {speaking}
   open         http://localhost:{PORT}
 """, flush=True)
 

@@ -24,7 +24,7 @@
   <div class="pills">
     <div class="pill ok"><i></i><span id="top-gw">Gateway: probing</span></div>
     <div class="pill"><i></i><span id="top-profile">Profile: default</span></div>
-    <div class="pill warn"><i></i><span id="top-voice">Voice: browser</span></div>
+    <div class="pill warn"><i></i><span id="top-voice">Voice: checking…</span></div>
   </div>
 </header>
 
@@ -54,9 +54,9 @@
     <div class="uplink">
       <div class="lbl">Pending uplink</div>
       <div class="field">
-        <textarea id="input" rows="4" spellcheck="false" placeholder="Speak through browser voice or type a Hermes instruction. Slash commands are supported."></textarea>
+        <textarea id="input" rows="4" spellcheck="false" placeholder="Talk with VOICE or type a Hermes instruction. Slash commands are supported."></textarea>
       </div>
-      <div class="tip" id="tip">Use <b>Browser Voice</b> for local speech recognition, or server ElevenLabs if configured. Try <b>/browser</b> “open Chrome and inspect the current tab”.</div>
+      <div class="tip" id="tip">Press <b>VOICE</b> to talk — Jarvis hears you through the local voice-service. Try <b>/browser</b> “open Chrome and inspect the current tab”.</div>
     </div>
   </section>
 
@@ -95,7 +95,7 @@
     </div>
 
     <div class="missionbar glass">
-      <button id="mic" class="ctl mic" title="Browser voice / microphone">◉ Browser Voice</button>
+      <button id="mic" class="ctl mic" title="Checking the voice-service…" disabled>◉ VOICE</button>
       <button id="run" class="ctl run" title="Send (⌘↵)">Transmit to JARVIS ▸</button>
       <button id="showCommands" class="ctl aux">Show Commands</button>
       <button id="missionBtn" class="ctl aux">Mission Control</button>
